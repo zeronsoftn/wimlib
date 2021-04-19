@@ -462,15 +462,12 @@ extract_chunk(const struct blob_descriptor *blob, u64 offset,
 			}
 		}
 	}
-	if (progress->extract.completed_bytes >= ctx->next_progress) {
-
+	if (should_update_progress(progress->extract.completed_bytes,
+				   progress->extract.total_bytes,
+				   &ctx->last_progress_time)) {
 		ret = extract_progress(ctx, WIMLIB_PROGRESS_MSG_EXTRACT_STREAMS);
 		if (ret)
 			return ret;
-
-		set_next_progress(progress->extract.completed_bytes,
-				  progress->extract.total_bytes,
-				  &ctx->next_progress);
 	}
 
 	if (unlikely(filedes_valid(&ctx->tmpfile_fd))) {

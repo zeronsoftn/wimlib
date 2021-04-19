@@ -296,7 +296,7 @@ struct write_blobs_progress_data {
 	wimlib_progress_func_t progfunc;
 	void *progctx;
 	union wimlib_progress_info progress;
-	u64 next_progress;
+	u64 last_progress_time;
 };
 
 static int
@@ -310,11 +310,6 @@ do_write_blobs_progress(struct write_blobs_progress_data *progress_data,
 	if (discarded) {
 		progress->write_streams.total_bytes -= complete_size;
 		progress->write_streams.total_streams -= complete_count;
-		if (progress_data->next_progress != ~(u64)0 &&
-		    progress_data->next_progress > progress->write_streams.total_bytes)
-		{
-			progress_data->next_progress = progress->write_streams.total_bytes;
-		}
 	} else {
 		progress->write_streams.completed_bytes += complete_size;
 		progress->write_streams.completed_compressed_bytes +=
@@ -322,18 +317,15 @@ do_write_blobs_progress(struct write_blobs_progress_data *progress_data,
 		progress->write_streams.completed_streams += complete_count;
 	}
 
-	if (progress->write_streams.completed_bytes >= progress_data->next_progress) {
-
+	if (should_update_progress(progress->write_streams.completed_bytes,
+				   progress->write_streams.total_bytes,
+				   &progress_data->last_progress_time)) {
 		ret = call_progress(progress_data->progfunc,
 				    WIMLIB_PROGRESS_MSG_WRITE_STREAMS,
 				    progress,
 				    progress_data->progctx);
 		if (ret)
 			return ret;
-
-		set_next_progress(progress->write_streams.completed_bytes,
-				  progress->write_streams.total_bytes,
-				  &progress_data->next_progress);
 	}
 	return 0;
 }
@@ -1158,7 +1150,7 @@ compute_blob_list_stats(struct list_head *blob_list,
 	ctx->progress_data.progress.write_streams.compression_type  = ctx->out_ctype;
 	ctx->progress_data.progress.write_streams.total_parts       = total_parts;
 	ctx->progress_data.progress.write_streams.completed_parts   = 0;
-	ctx->progress_data.next_progress = 0;
+	ctx->progress_data.last_progress_time = 0;
 	return 0;
 }
 

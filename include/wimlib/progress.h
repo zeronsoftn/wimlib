@@ -3,6 +3,7 @@
 
 #include "wimlib.h"
 #include "wimlib/paths.h"
+#include "wimlib/timestamp.h"
 #include "wimlib/types.h"
 
 /* If specified, call the user-provided progress function and check its result.
@@ -34,26 +35,20 @@ extern int
 report_error(wimlib_progress_func_t progfunc,
 	     void *progctx, int error_code, const tchar *path);
 
-/* Rate-limiting of byte-count based progress messages: update *next_progress_p
- * to the value that completed_bytes needs to reach before the next progress
- * message will be sent.  */
-static inline void
-set_next_progress(u64 completed_bytes, u64 total_bytes, u64 *next_progress_p)
+/* Rate-limiting of byte-count based progress messages.  We update the progress
+ * at most 5 times per second.  */
+static inline bool
+should_update_progress(u64 completed_bytes, u64 total_bytes,
+		       u64 *last_progress_time)
 {
-	if (*next_progress_p < total_bytes) {
-		/*
-		 * Send the next message as soon as:
-		 *	- another 1/128 of the total has been processed;
-		 *	- OR another 5000000 bytes have been processed;
-		 *	- OR all bytes have been processed.
-		 */
-		*next_progress_p = min(min(completed_bytes + total_bytes / 128,
-					   completed_bytes + 5000000),
-				       total_bytes);
-	} else {
-		/* Last message has been sent.  */
-		*next_progress_p = ~0;
-	}
+	u64 now = now_as_wim_timestamp();
+
+	if (completed_bytes < total_bytes &&
+	    now - *last_progress_time < 200 * TICKS_PER_MILLISECOND)
+		return false;
+
+	*last_progress_time = now;
+	return true;
 }
 
 /* Windows: temporarily remove the stream name from the path  */

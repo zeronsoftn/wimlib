@@ -12,6 +12,28 @@
 
 #include "wimlib/types.h"
 
+/*
+ * Timestamps in WIM files are Windows NT timestamps, or FILETIMEs: 64-bit
+ * values storing the number of 100-nanosecond ticks since January 1, 1601.
+ *
+ * Note: UNIX timestamps are signed; Windows timestamps are not.  Negative UNIX
+ * timestamps represent times before 1970-01-01.  When such a timestamp is
+ * converted to a Windows timestamp, we can preserve the correct date provided
+ * that it is not also before 1601-01-01.
+ */
+
+#define NANOSECONDS_PER_TICK	100
+#define TICKS_PER_SECOND	(1000000000 / NANOSECONDS_PER_TICK)
+#define TICKS_PER_MILLISECOND	(TICKS_PER_SECOND / 1000)
+#define TICKS_PER_MICROSECOND	(TICKS_PER_SECOND / 1000000)
+
+/*
+ * EPOCH_DISTANCE is the number of seconds separating the Windows NT and UNIX
+ * epochs.  This is equal to ((1970-1601)*365+89)*24*60*60.  89 is the number
+ * of leap years between 1970 and 1601.
+ */
+#define EPOCH_DISTANCE		11644473600
+
 struct wimlib_timespec;
 
 extern time_t

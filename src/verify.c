@@ -43,7 +43,7 @@ struct verify_blob_list_ctx {
 	wimlib_progress_func_t progfunc;
 	void *progctx;
 	union wimlib_progress_info *progress;
-	u64 next_progress;
+	u64 last_progress_time;
 };
 
 static int
@@ -58,17 +58,14 @@ verify_continue_blob(const struct blob_descriptor *blob, u64 offset,
 
 	progress->verify_streams.completed_bytes += size;
 
-	if (progress->verify_streams.completed_bytes >= ctx->next_progress) {
-
+	if (should_update_progress(progress->verify_streams.completed_bytes,
+				   progress->verify_streams.total_bytes,
+				   &ctx->last_progress_time)) {
 		int ret = call_progress(ctx->progfunc,
 					WIMLIB_PROGRESS_MSG_VERIFY_STREAMS,
 					progress, ctx->progctx);
 		if (ret)
 			return ret;
-
-		set_next_progress(progress->verify_streams.completed_bytes,
-				  progress->verify_streams.total_bytes,
-				  &ctx->next_progress);
 	}
 	return 0;
 }
@@ -161,7 +158,7 @@ wimlib_verify_wim(WIMStruct *wim, int verify_flags)
 	ctx.progfunc = wim->progfunc;
 	ctx.progctx = wim->progctx;
 	ctx.progress = &progress;
-	ctx.next_progress = 0;
+	ctx.last_progress_time = 0;
 
 	ret = call_progress(ctx.progfunc, WIMLIB_PROGRESS_MSG_VERIFY_STREAMS,
 			    ctx.progress, ctx.progctx);

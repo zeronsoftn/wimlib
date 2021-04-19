@@ -68,7 +68,7 @@ struct apply_ctx {
 
 	/* The members below should not be used outside of extract.c  */
 	const struct apply_operations *apply_ops;
-	u64 next_progress;
+	u64 last_progress_time;
 	unsigned long invalid_sequence;
 	unsigned long num_blobs_remaining;
 	struct list_head blob_list;
