@@ -27,8 +27,9 @@
 
 #include <limits.h>
 
-#include "wimlib/divsufsort.h"
+#include "wimlib/assert.h"
 #include "wimlib/lcpit_matchfinder.h"
+#include "wimlib/libsais.h"
 #include "wimlib/util.h"
 
 #define LCP_BITS		6
@@ -47,6 +48,8 @@
 #define HUGE_UNVISITED_TAG	0x100000000
 
 #define PREFETCH_SAFETY		5
+
+#define LIBSAIS_EXTRA_SPACE	8192
 
 /*
  * Build the LCP (Longest Common Prefix) array in linear time.
@@ -541,15 +544,17 @@ lcpit_advance_one_byte_huge(const u32 cur_pos,
 static forceinline u64
 get_pos_data_size(size_t max_bufsize)
 {
-	return (u64)max((u64)max_bufsize + PREFETCH_SAFETY,
-			DIVSUFSORT_TMP_LEN) * sizeof(u32);
+	return ((u64)max_bufsize + PREFETCH_SAFETY) * sizeof(u32);
 }
 
 static forceinline u64
 get_intervals_size(size_t max_bufsize)
 {
-	return ((u64)max_bufsize + PREFETCH_SAFETY) *
+	size_t sa_size = (max_bufsize + LIBSAIS_EXTRA_SPACE) * sizeof(u32);
+	size_t intervals_size = ((u64)max_bufsize + PREFETCH_SAFETY) *
 		(max_bufsize <= MAX_NORMAL_BUFSIZE ? sizeof(u32) : sizeof(u64));
+
+	return max(sa_size, intervals_size);
 }
 
 /*
@@ -604,14 +609,13 @@ lcpit_matchfinder_init(struct lcpit_matchfinder *mf, size_t max_bufsize,
  * by indices into the byte array.  It can equivalently be viewed as a mapping
  * from suffix rank to suffix position.
  *
- * To build the suffix array, we use libdivsufsort, which uses an
+ * To build the suffix array, we use libsais, which uses an
  * induced-sorting-based algorithm.  In practice, this seems to be the fastest
  * suffix array construction algorithm currently available.
  *
  * References:
  *
- *	Y. Mori.  libdivsufsort, a lightweight suffix-sorting library.
- *	https://github.com/y-256/libdivsufsort
+ *      libsais by Ilya Grebnov: https://github.com/IlyaGrebnov/libsais
  *
  *	G. Nong, S. Zhang, and W.H. Chan.  2009.  Linear Suffix Array
  *	Construction by Almost Pure Induced-Sorting.  Data Compression
@@ -622,13 +626,12 @@ lcpit_matchfinder_init(struct lcpit_matchfinder *mf, size_t max_bufsize,
  *	Issue 2, 2007 Article No. 4.
  */
 static void
-build_SA(u32 SA[], const u8 T[], u32 n, u32 *tmp)
+build_SA(u32 SA[], const u8 T[], u32 n)
 {
-	/* Note: divsufsort() requires a fixed amount of temporary space.  The
-	 * implementation of divsufsort() has been modified from the original to
-	 * use the provided temporary space instead of allocating its own, since
-	 * we don't want to have to deal with malloc() failures here.  */
-	divsufsort(T, SA, n, tmp);
+	int ret;
+
+	ret = libsais(T, SA, n, LIBSAIS_EXTRA_SPACE, NULL);
+	wimlib_assert(ret == 0);
 }
 
 /*
@@ -656,10 +659,9 @@ void
 lcpit_matchfinder_load_buffer(struct lcpit_matchfinder *mf, const u8 *T, u32 n)
 {
 	/* intervals[] temporarily stores SA and LCP packed together.
-	 * pos_data[] temporarily stores ISA.
-	 * pos_data[] is also used as the temporary space for divsufsort().  */
+	 * pos_data[] temporarily stores ISA.  */
 
-	build_SA(mf->intervals, T, n, mf->pos_data);
+	build_SA(mf->intervals, T, n);
 	build_ISA(mf->pos_data, mf->intervals, n);
 	if (n <= MAX_NORMAL_BUFSIZE) {
 		mf->nice_match_len = min(mf->orig_nice_match_len, LCP_MAX);

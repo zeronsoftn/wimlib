@@ -44,7 +44,6 @@ libwim_la_SOURCES =		\
 	src/decompress_common.c	\
 	src/delete_image.c	\
 	src/dentry.c		\
-	src/divsufsort.c	\
 	src/encoding.c		\
 	src/error.c		\
 	src/export_image.c	\
@@ -58,6 +57,7 @@ libwim_la_SOURCES =		\
 	src/iterate_dir.c	\
 	src/join.c		\
 	src/lcpit_matchfinder.c	\
+	src/libsais.c		\
 	src/lzms_common.c	\
 	src/lzms_compress.c	\
 	src/lzms_decompress.c	\
@@ -108,7 +108,6 @@ libwim_la_SOURCES =		\
 	include/wimlib/decompressor_ops.h	\
 	include/wimlib/decompress_common.h	\
 	include/wimlib/dentry.h		\
-	include/wimlib/divsufsort.h	\
 	include/wimlib/encoding.h	\
 	include/wimlib/endianness.h	\
 	include/wimlib/error.h		\
@@ -121,6 +120,7 @@ libwim_la_SOURCES =		\
 	include/wimlib/inode_table.h	\
 	include/wimlib/integrity.h	\
 	include/wimlib/lcpit_matchfinder.h	\
+	include/wimlib/libsais.h	\
 	include/wimlib/list.h		\
 	include/wimlib/lz_extend.h	\
 	include/wimlib/lz_hash.h	\
