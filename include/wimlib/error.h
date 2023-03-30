@@ -7,12 +7,6 @@
 #include "wimlib/compiler.h"
 #include "wimlib/types.h"
 
-static inline int _format_attribute(printf, 1, 2)
-dummy_tprintf(const tchar *format, ...)
-{
-	return 0;
-}
-
 void _format_attribute(printf, 1, 2) __attribute__((cold))
 wimlib_error(const tchar *format, ...);
 
@@ -25,10 +19,10 @@ wimlib_warning(const tchar *format, ...);
 void _format_attribute(printf, 1, 2) __attribute__((cold))
 wimlib_warning_with_errno(const tchar *format, ...);
 
-#  define ERROR(format, ...)			wimlib_error(T(format), ## __VA_ARGS__)
-#  define ERROR_WITH_ERRNO(format, ...)		wimlib_error_with_errno(T(format), ## __VA_ARGS__)
-#  define WARNING(format, ...)			wimlib_warning(T(format), ## __VA_ARGS__)
-#  define WARNING_WITH_ERRNO(format, ...)	wimlib_warning_with_errno(T(format), ## __VA_ARGS__)
+#define ERROR(format, ...)		wimlib_error(T(format), ## __VA_ARGS__)
+#define ERROR_WITH_ERRNO(format, ...)	wimlib_error_with_errno(T(format), ## __VA_ARGS__)
+#define WARNING(format, ...)		wimlib_warning(T(format), ## __VA_ARGS__)
+#define WARNING_WITH_ERRNO(format, ...)	wimlib_warning_with_errno(T(format), ## __VA_ARGS__)
 extern bool wimlib_print_errors;
 extern FILE *wimlib_error_file;
 
