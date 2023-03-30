@@ -196,7 +196,7 @@ win32_path_to_nt_path(const wchar_t *win32_path, UNICODE_STRING *nt_path)
 	if (status == STATUS_NO_MEMORY)
 		return WIMLIB_ERR_NOMEM;
 
-	winnt_error(status, L"\"%ls\": invalid path name", win32_path);
+	winnt_error(status, "\"%ls\": invalid path name", win32_path);
 	return WIMLIB_ERR_INVALID_PARAM;
 }
 
@@ -266,9 +266,11 @@ win32_try_to_attach_wof(const wchar_t *drive)
 
 
 static void
-windows_msg(u32 code, const wchar_t *format, va_list va,
+windows_msg(u32 code, const char *format, va_list va,
 	    bool is_ntstatus, bool is_error)
 {
+	return;
+#if 0
 	wchar_t _buf[STACK_MAX / 8];
 	wchar_t *buf = _buf;
 	size_t buflen = ARRAY_LEN(_buf);
@@ -330,10 +332,11 @@ realloc:
 	if (buf)
 		goto retry;
 	ERROR("Ran out of memory while building error message!!!");
+#endif
 }
 
 void
-win32_warning(DWORD err, const wchar_t *format, ...)
+win32_warning(DWORD err, const char *format, ...)
 {
 	va_list va;
 
@@ -343,7 +346,7 @@ win32_warning(DWORD err, const wchar_t *format, ...)
 }
 
 void
-win32_error(DWORD err, const wchar_t *format, ...)
+win32_error(DWORD err, const char *format, ...)
 {
 	va_list va;
 
@@ -353,7 +356,7 @@ win32_error(DWORD err, const wchar_t *format, ...)
 }
 
 void
-winnt_warning(NTSTATUS status, const wchar_t *format, ...)
+winnt_warning(NTSTATUS status, const char *format, ...)
 {
 	va_list va;
 
@@ -363,7 +366,7 @@ winnt_warning(NTSTATUS status, const wchar_t *format, ...)
 }
 
 void
-winnt_error(NTSTATUS status, const wchar_t *format, ...)
+winnt_error(NTSTATUS status, const char *format, ...)
 {
 	va_list va;
 

@@ -51,14 +51,14 @@ FILE *wimlib_error_file = NULL; /* Set in wimlib_global_init() */
 static bool wimlib_owns_error_file = false;
 
 static void
-wimlib_vmsg(const tchar *tag, const tchar *format, va_list va, bool perror)
+wimlib_vmsg(const char *tag, const char *format, va_list va, bool perror)
 {
 	if (!wimlib_print_errors)
 		return;
 	int errno_save = errno;
 	fflush(stdout);
-	tfputs(tag, wimlib_error_file);
-	tvfprintf(wimlib_error_file, format, va);
+	fputs(tag, wimlib_error_file);
+	vfprintf(wimlib_error_file, format, va);
 	if (perror && errno_save != 0) {
 		tchar buf[64];
 		int res;
@@ -80,42 +80,42 @@ wimlib_vmsg(const tchar *tag, const tchar *format, va_list va, bool perror)
 }
 
 void
-wimlib_error(const tchar *format, ...)
+wimlib_error(const char *format, ...)
 {
 	va_list va;
 
 	va_start(va, format);
-	wimlib_vmsg(T("\r[ERROR] "), format, va, false);
+	wimlib_vmsg("\r[ERROR] ", format, va, false);
 	va_end(va);
 }
 
 void
-wimlib_error_with_errno(const tchar *format, ...)
+wimlib_error_with_errno(const char *format, ...)
 {
 	va_list va;
 
 	va_start(va, format);
-	wimlib_vmsg(T("\r[ERROR] "), format, va, true);
+	wimlib_vmsg("\r[ERROR] ", format, va, true);
 	va_end(va);
 }
 
 void
-wimlib_warning(const tchar *format, ...)
+wimlib_warning(const char *format, ...)
 {
 	va_list va;
 
 	va_start(va, format);
-	wimlib_vmsg(T("\r[WARNING] "), format, va, false);
+	wimlib_vmsg("\r[WARNING] ", format, va, false);
 	va_end(va);
 }
 
 void
-wimlib_warning_with_errno(const tchar *format, ...)
+wimlib_warning_with_errno(const char *format, ...)
 {
 	va_list va;
 
 	va_start(va, format);
-	wimlib_vmsg(T("\r[WARNING] "), format, va, true);
+	wimlib_vmsg("\r[WARNING] ", format, va, true);
 	va_end(va);
 }
 

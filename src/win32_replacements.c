@@ -495,7 +495,7 @@ do_pread_or_pwrite(int fd, void *buf, size_t count, off_t offset,
 	relative_offset.QuadPart = 0;
 	if (!SetFilePointerEx(h, relative_offset, &orig_offset, FILE_CURRENT)) {
 		err = GetLastError();
-		win32_error(err, L"Failed to get original file position");
+		win32_error(err, "Failed to get original file position");
 		goto error;
 	}
 
@@ -512,7 +512,7 @@ do_pread_or_pwrite(int fd, void *buf, size_t count, off_t offset,
 		bret = ReadFile(h, buf, count, &result, &overlapped);
 	if (!bret) {
 		err = GetLastError();
-		win32_error(err, L"Failed to %s %zu bytes at offset %"PRIu64,
+		win32_error(err, "Failed to %s %zu bytes at offset %"PRIu64,
 			    (is_pwrite ? "write" : "read"), count, offset);
 		goto error;
 	}
@@ -522,7 +522,7 @@ do_pread_or_pwrite(int fd, void *buf, size_t count, off_t offset,
 	/* Restore the original position */
 	if (!SetFilePointerEx(h, orig_offset, NULL, FILE_BEGIN)) {
 		err = GetLastError();
-		win32_error(err, L"Failed to restore file position to %"PRIu64,
+		win32_error(err, "Failed to restore file position to %"PRIu64,
 			    offset);
 		goto error;
 	}
@@ -568,7 +568,7 @@ win32_read(int fd, void *buf, size_t count)
 	if (!ReadFile(h, buf, count, &result, NULL)) {
 		DWORD err = GetLastError();
 		win32_error(err,
-			    L"Error reading %zu bytes from fd %d", count, fd);
+			    "Error reading %zu bytes from fd %d", count, fd);
 		set_errno_from_win32_error(err);
 		return -1;
 	}
@@ -592,7 +592,7 @@ win32_write(int fd, const void *buf, size_t count)
 	if (!WriteFile(h, buf, count, &result, NULL)) {
 		DWORD err = GetLastError();
 		win32_error(err,
-			    L"Error writing %zu bytes to fd %d", count, fd);
+			    "Error writing %zu bytes to fd %d", count, fd);
 		set_errno_from_win32_error(err);
 		return -1;
 	}
@@ -750,7 +750,7 @@ get_random_bytes(void *p, size_t n)
 
 		if (!RtlGenRandom(p, count)) {
 			win32_error(GetLastError(),
-				    L"RtlGenRandom() failed (count=%u)", count);
+				    "RtlGenRandom() failed (count=%u)", count);
 			wimlib_assert(0);
 			count = 0;
 		}

@@ -95,7 +95,7 @@ query_partition_and_disk_info(const wchar_t *path,
 
 	h = open_file(vol_name, GENERIC_READ);
 	if (h == INVALID_HANDLE_VALUE) {
-		win32_error(GetLastError(), L"\"%ls\": Can't open volume device",
+		win32_error(GetLastError(), "\"%ls\": Can't open volume device",
 			    vol_name);
 		ret = WIMLIB_ERR_OPEN;
 		goto out;
@@ -105,7 +105,7 @@ query_partition_and_disk_info(const wchar_t *path,
 			  part_info, sizeof(PARTITION_INFORMATION_EX)))
 	{
 		win32_error(GetLastError(),
-			    L"\"%ls\": Can't get partition info", vol_name);
+			    "\"%ls\": Can't get partition info", vol_name);
 		ret = WIMLIB_ERR_READ;
 		goto out;
 	}
@@ -124,7 +124,7 @@ query_partition_and_disk_info(const wchar_t *path,
 			break;
 		if (GetLastError() != ERROR_MORE_DATA) {
 			win32_error(GetLastError(),
-				    L"\"%ls\": Can't get volume extent info",
+				    "\"%ls\": Can't get volume extent info",
 				    vol_name);
 			ret = WIMLIB_ERR_READ;
 			goto out;
@@ -149,7 +149,7 @@ query_partition_and_disk_info(const wchar_t *path,
 	h = open_file(disk_name, GENERIC_READ);
 	if (h == INVALID_HANDLE_VALUE) {
 		win32_error(GetLastError(),
-			    L"\"%ls\": Can't open disk device", disk_name);
+			    "\"%ls\": Can't open disk device", disk_name);
 		ret = WIMLIB_ERR_OPEN;
 		goto out;
 	}
@@ -168,7 +168,7 @@ query_partition_and_disk_info(const wchar_t *path,
 			break;
 		if (GetLastError() != ERROR_INSUFFICIENT_BUFFER) {
 			win32_error(GetLastError(),
-				    L"\"%ls\": Can't get disk info", disk_name);
+				    "\"%ls\": Can't get disk info", disk_name);
 			ret = WIMLIB_ERR_READ;
 			goto out;
 		}
@@ -270,7 +270,7 @@ write_wimoverlay_dat(const wchar_t *path, const void *contents, u32 size)
 		       CREATE_ALWAYS, FILE_FLAG_BACKUP_SEMANTICS, NULL);
 	if (h == INVALID_HANDLE_VALUE) {
 		win32_error(GetLastError(),
-			    L"\"%ls\": Can't open file for writing", path);
+			    "\"%ls\": Can't open file for writing", path);
 		return WIMLIB_ERR_OPEN;
 	}
 
@@ -279,14 +279,14 @@ write_wimoverlay_dat(const wchar_t *path, const void *contents, u32 size)
 	    bytes_written != size)
 	{
 		win32_error(GetLastError(),
-			    L"\"%ls\": Can't write file", path);
+			    "\"%ls\": Can't write file", path);
 		CloseHandle(h);
 		return WIMLIB_ERR_WRITE;
 	}
 
 	if (!CloseHandle(h)) {
 		win32_error(GetLastError(),
-			    L"\"%ls\": Can't close handle", path);
+			    "\"%ls\": Can't close handle", path);
 		return WIMLIB_ERR_WRITE;
 	}
 
@@ -586,11 +586,11 @@ retry:
 				err = err2;
 			}
 		}
-		win32_error(err, L"\"%ls\": Can't open for reading", path);
+		win32_error(err, "\"%ls\": Can't open for reading", path);
 		return WIMLIB_ERR_OPEN;
 	}
 	if (!GetFileInformationByHandle(h, &info)) {
-		win32_error(GetLastError(), L"\"%ls\": Can't query metadata", path);
+		win32_error(GetLastError(), "\"%ls\": Can't query metadata", path);
 		CloseHandle(h);
 		return WIMLIB_ERR_STAT;
 	}
@@ -608,7 +608,7 @@ retry:
 	if (!ReadFile(h, contents, info.nFileSizeLow, &bytes_read, NULL) ||
 	    bytes_read != info.nFileSizeLow)
 	{
-		win32_error(GetLastError(), L"\"%ls\": Can't read data", path);
+		win32_error(GetLastError(), "\"%ls\": Can't read data", path);
 		CloseHandle(h);
 		ret = WIMLIB_ERR_READ;
 		goto out_free_contents;
@@ -934,7 +934,7 @@ retry_ioctl:
 
 	if (h == INVALID_HANDLE_VALUE) {
 		win32_error(GetLastError(),
-			    L"Failed to open \"%ls\"", drive_path + 4);
+			    "Failed to open \"%ls\"", drive_path + 4);
 		ret = WIMLIB_ERR_OPEN;
 		goto out_free_in;
 	}
@@ -956,7 +956,7 @@ retry_ioctl:
 			ret = WIMLIB_ERR_UNSUPPORTED;
 			goto out_close_handle;
 		} else {
-			win32_error(err, L"Failed to add overlay source \"%ls\" "
+			win32_error(err, "Failed to add overlay source \"%ls\" "
 				    "to volume \"%ls\"", wim_path, drive_path + 4);
 			ret = WIMLIB_ERR_WIMBOOT;
 			goto out_close_handle;

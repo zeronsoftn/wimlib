@@ -349,7 +349,7 @@ read_winnt_stream_prefix(const struct windows_file *file,
 			      "Consider using snapshot (VSS) mode.",
 			      windows_file_to_string(file, buf, sizeof(buf)));
 		} else {
-			winnt_error(status, L"Can't open %ls for reading",
+			winnt_error(status, "Can't open %ls for reading",
 				    windows_file_to_string(file, buf, sizeof(buf)));
 		}
 		return WIMLIB_ERR_OPEN;
@@ -375,7 +375,7 @@ read_winnt_stream_prefix(const struct windows_file *file,
 				      windows_file_to_string(file, buf, sizeof(buf)));
 				ret = WIMLIB_ERR_CONCURRENT_MODIFICATION_DETECTED;
 			} else {
-				winnt_warning(status, L"Error reading data from %ls",
+				winnt_warning(status, "Error reading data from %ls",
 					      windows_file_to_string(file, buf, sizeof(buf)));
 
 				/* Currently these retries are purely a guess;
@@ -457,7 +457,7 @@ read_win32_encrypted_file_prefix(const wchar_t *path, bool is_dir, u64 size,
 	err = OpenEncryptedFileRaw(path, flags, &file_ctx);
 	if (err != ERROR_SUCCESS) {
 		win32_error(err,
-			    L"Failed to open encrypted file \"%ls\" for raw read",
+			    "Failed to open encrypted file \"%ls\" for raw read",
 			    path);
 		return WIMLIB_ERR_OPEN;
 	}
@@ -467,7 +467,7 @@ read_win32_encrypted_file_prefix(const wchar_t *path, bool is_dir, u64 size,
 		ret = export_ctx.wimlib_err_code;
 		if (ret == 0) {
 			win32_error(err,
-				    L"Failed to read encrypted file \"%ls\"",
+				    "Failed to read encrypted file \"%ls\"",
 				    path);
 			ret = WIMLIB_ERR_READ;
 		}
@@ -650,7 +650,7 @@ out:
 	if (unlikely(buf != _buf))
 		FREE(buf);
 	if (!NT_SUCCESS(status)) {
-		winnt_error(status, L"\"%ls\": Can't read security descriptor",
+		winnt_error(status, "\"%ls\": Can't read security descriptor",
 			    printable_path(ctx));
 		return WIMLIB_ERR_STAT;
 	}
@@ -684,7 +684,7 @@ winnt_load_object_id(HANDLE h, struct wim_inode *inode,
 	}
 
 	if (!NT_SUCCESS(status)) {
-		winnt_error(status, L"\"%ls\": Can't read object ID",
+		winnt_error(status, "\"%ls\": Can't read object ID",
 			    printable_path(ctx));
 		return WIMLIB_ERR_STAT;
 	}
@@ -755,7 +755,7 @@ retry:
 			ret = 0;
 			goto out;
 		}
-		winnt_error(status, L"\"%ls\": Can't read extended attributes",
+		winnt_error(status, "\"%ls\": Can't read extended attributes",
 			    printable_path(ctx));
 		ret = WIMLIB_ERR_STAT;
 		goto out;
@@ -876,7 +876,7 @@ winnt_recurse_directory(HANDLE h,
 	}
 
 	if (unlikely(status != STATUS_NO_MORE_FILES)) {
-		winnt_error(status, L"\"%ls\": Can't read directory",
+		winnt_error(status, "\"%ls\": Can't read directory",
 			    printable_path(ctx));
 		ret = WIMLIB_ERR_READ;
 	}
@@ -1135,7 +1135,7 @@ winnt_load_reparse_data(HANDLE h, struct wim_inode *inode,
 	status = winnt_fsctl(h, FSCTL_GET_REPARSE_POINT,
 			     NULL, 0, &rpbuf, sizeof(rpbuf), &len);
 	if (!NT_SUCCESS(status)) {
-		winnt_error(status, L"\"%ls\": Can't get reparse point",
+		winnt_error(status, "\"%ls\": Can't get reparse point",
 			    printable_path(ctx));
 		return WIMLIB_ERR_READLINK;
 	}
@@ -1207,7 +1207,7 @@ win32_get_encrypted_file_size(const wchar_t *path, bool is_dir, u64 *size_ret)
 	err = OpenEncryptedFileRaw(path, flags, &file_ctx);
 	if (err != ERROR_SUCCESS) {
 		win32_error(err,
-			    L"Failed to open encrypted file \"%ls\" for raw read",
+			    "Failed to open encrypted file \"%ls\" for raw read",
 			    path);
 		return WIMLIB_ERR_OPEN;
 	}
@@ -1216,7 +1216,7 @@ win32_get_encrypted_file_size(const wchar_t *path, bool is_dir, u64 *size_ret)
 				   size_ret, file_ctx);
 	if (err != ERROR_SUCCESS) {
 		win32_error(err,
-			    L"Failed to read raw encrypted data from \"%ls\"",
+			    "Failed to read raw encrypted data from \"%ls\"",
 			    path);
 		ret = WIMLIB_ERR_READ;
 	} else {
@@ -1375,7 +1375,7 @@ winnt_scan_data_streams(HANDLE h, struct wim_inode *inode, u64 file_size,
 			goto unnamed_only;
 		default:
 			winnt_error(status,
-				    L"\"%ls\": Failed to query stream information",
+				    "\"%ls\": Failed to query stream information",
 				    printable_path(ctx));
 			ret = WIMLIB_ERR_READ;
 			goto out_free_buf;
@@ -1569,7 +1569,7 @@ try_to_use_wimboot_hash(HANDLE h, struct wim_inode *inode,
 		/* Was there some other failure?  */
 		if (status != STATUS_SUCCESS) {
 			winnt_error(status,
-				    L"\"%ls\": FSCTL_GET_EXTERNAL_BACKING failed",
+				    "\"%ls\": FSCTL_GET_EXTERNAL_BACKING failed",
 				    printable_path(ctx));
 			return WIMLIB_ERR_STAT;
 		}
@@ -1671,7 +1671,7 @@ get_volume_information(HANDLE h, struct winnt_scan_ctx *ctx)
 		ctx->is_ntfs = (attr_info->FileSystemNameLength == 4 * sizeof(wchar_t)) &&
 				!wmemcmp(attr_info->FileSystemName, L"NTFS", 4);
 	} else {
-		winnt_warning(status, L"\"%ls\": Can't get volume attributes",
+		winnt_warning(status, "\"%ls\": Can't get volume attributes",
 			      printable_path(ctx));
 	}
 
@@ -1686,7 +1686,7 @@ get_volume_information(HANDLE h, struct winnt_scan_ctx *ctx)
 	{
 		ctx->params->capture_root_dev = vol_info.VolumeSerialNumber;
 	} else {
-		winnt_warning(status, L"\"%ls\": Can't get volume ID",
+		winnt_warning(status, "\"%ls\": Can't get volume ID",
 			      printable_path(ctx));
 	}
 
@@ -1695,7 +1695,7 @@ get_volume_information(HANDLE h, struct winnt_scan_ctx *ctx)
 	if (NT_SUCCESS(status)) {
 		ctx->params->capture_root_ino = file_info.ino;
 	} else {
-		winnt_warning(status, L"\"%ls\": Can't get file information",
+		winnt_warning(status, "\"%ls\": Can't get file information",
 			      printable_path(ctx));
 	}
 }
@@ -1748,7 +1748,7 @@ winnt_build_dentry_tree(struct wim_dentry **root_ret,
 			ret = WIMLIB_ERR_OPEN;
 			goto out;
 		}
-		winnt_error(status, L"\"%ls\": Can't open file",
+		winnt_error(status, "\"%ls\": Can't open file",
 			    printable_path(ctx));
 		if (status == STATUS_FVE_LOCKED_VOLUME)
 			ret = WIMLIB_ERR_FVE_LOCKED_VOLUME;
@@ -1760,7 +1760,7 @@ winnt_build_dentry_tree(struct wim_dentry **root_ret,
 	/* Get information about the file.  */
 	status = get_file_info(h, &file_info);
 	if (!NT_SUCCESS(status)) {
-		winnt_error(status, L"\"%ls\": Can't get file information",
+		winnt_error(status, "\"%ls\": Can't get file information",
 			    printable_path(ctx));
 		ret = WIMLIB_ERR_STAT;
 		goto out;
@@ -1897,7 +1897,7 @@ winnt_build_dentry_tree(struct wim_dentry **root_ret,
 				      relative_path_nchars, FILE_LIST_DIRECTORY,
 				      &h);
 		if (!NT_SUCCESS(status)) {
-			winnt_error(status, L"\"%ls\": Can't open directory",
+			winnt_error(status, "\"%ls\": Can't open directory",
 				    printable_path(ctx));
 			ret = WIMLIB_ERR_OPEN;
 			goto out;
@@ -2583,7 +2583,7 @@ load_files_from_mft(const wchar_t *path, struct ntfs_inode_map *inode_map)
 			ret = -1;
 		} else {
 			winnt_error(status,
-				    L"Error enumerating files on volume \"%ls\"",
+				    "Error enumerating files on volume \"%ls\"",
 				    path);
 			/* Try standard recursive scan instead  */
 			ret = WIMLIB_ERR_UNSUPPORTED;
@@ -2819,7 +2819,7 @@ generate_wim_structures_recursive(struct wim_dentry **root_ret,
 					    READ_CONTROL |
 						ACCESS_SYSTEM_SECURITY, &h);
 			if (!NT_SUCCESS(status)) {
-				winnt_error(status, L"Can't open \"%ls\" to "
+				winnt_error(status, "Can't open \"%ls\" to "
 					    "read security descriptor",
 					    printable_path(ctx));
 				ret = WIMLIB_ERR_OPEN;
@@ -3014,7 +3014,7 @@ win32_build_dentry_tree(struct wim_dentry **root_ret,
 	status = winnt_open(params->cur_path, params->cur_path_nchars,
 			    FILE_READ_ATTRIBUTES, &h);
 	if (!NT_SUCCESS(status)) {
-		winnt_error(status, L"Can't open \"%ls\"", root_disk_path);
+		winnt_error(status, "Can't open \"%ls\"", root_disk_path);
 		if (status == STATUS_FVE_LOCKED_VOLUME)
 			ret = WIMLIB_ERR_FVE_LOCKED_VOLUME;
 		else

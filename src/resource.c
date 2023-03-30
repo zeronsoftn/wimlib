@@ -1037,7 +1037,7 @@ report_sha1_mismatch(struct blob_descriptor *blob,
 		const struct wim_resource_descriptor *rdesc = blob->rdesc;
 
 		(recover_data ? wimlib_warning : wimlib_error)(
-		      T("A WIM resource is corrupted!\n"
+		        "A WIM resource is corrupted!\n"
 			"        WIM file: \"%"TS"\"\n"
 			"        Blob uncompressed size: %"PRIu64"\n"
 			"        Resource offset in WIM: %"PRIu64"\n"
@@ -1047,7 +1047,7 @@ report_sha1_mismatch(struct blob_descriptor *blob,
 			"        Resource compression type: %"TS"\n"
 			"        Resource compression chunk size: %"PRIu32"\n"
 			"        Expected SHA-1: %"TS"\n"
-			"        Actual SHA-1: %"TS"\n"),
+			"        Actual SHA-1: %"TS"\n",
 		      rdesc->wim->filename,
 		      blob->size,
 		      rdesc->offset_in_wim,

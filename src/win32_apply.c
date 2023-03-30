@@ -223,7 +223,7 @@ get_vol_flags(const wchar_t *target, DWORD *vol_flags_ret,
 				  ARRAY_LEN(filesystem_name)))
 	{
 		win32_warning(GetLastError(),
-			      L"Failed to get volume information for \"%ls\"",
+			      "Failed to get volume information for \"%ls\"",
 			      target);
 		return;
 	}
@@ -667,7 +667,7 @@ set_backed_from_wim(HANDLE h, struct wim_inode *inode, struct win32_apply_ctx *c
 		const DWORD err = GetLastError();
 
 		build_extraction_path(inode_first_extraction_dentry(inode), ctx);
-		win32_error(err, L"\"%ls\": Couldn't set WIMBoot pointer data",
+		win32_error(err, "\"%ls\": Couldn't set WIMBoot pointer data",
 			    current_path(ctx));
 		return WIMLIB_ERR_WIMBOOT;
 	}
@@ -845,7 +845,7 @@ out_unload_key:
 out_check_res:
 	if (res) {
 		/* Warning only.  */
-		win32_warning(res, L"Failed to set \\Setup: dword \"WimBoot\"=1 "
+		win32_warning(res, "Failed to set \\Setup: dword \"WimBoot\"=1 "
 			      "value in registry hive \"%ls\"",
 			      ctx->pathbuf.Buffer);
 	}
@@ -1047,7 +1047,7 @@ open_target_directory(struct win32_apply_ctx *ctx)
 			      NULL,
 			      0);
 	if (!NT_SUCCESS(status)) {
-		winnt_error(status, L"Can't open or create directory \"%ls\"",
+		winnt_error(status, "Can't open or create directory \"%ls\"",
 			    ctx->common.target);
 		return WIMLIB_ERR_OPENDIR;
 	}
@@ -1170,7 +1170,7 @@ adjust_compression_attribute(HANDLE h, const struct wim_dentry *dentry,
 	if (NT_SUCCESS(status))
 		return 0;
 
-	winnt_error(status, L"Can't %s compression attribute on \"%ls\"",
+	winnt_error(status, "Can't %s compression attribute on \"%ls\"",
 		    (compressed ? "set" : "clear"), current_path(ctx));
 	return WIMLIB_ERR_SET_ATTRIBUTES;
 }
@@ -1192,7 +1192,7 @@ set_sparse_flag(HANDLE h, struct win32_apply_ctx *ctx)
 	if (NT_SUCCESS(status))
 		return 0;
 
-	winnt_error(status, L"Can't set sparse flag on \"%ls\"",
+	winnt_error(status, "Can't set sparse flag on \"%ls\"",
 		    current_path(ctx));
 	return WIMLIB_ERR_SET_ATTRIBUTES;
 }
@@ -1230,7 +1230,7 @@ try_to_enable_short_names(const wchar_t *volume)
 
 fail:
 	win32_warning(GetLastError(),
-		      L"Failed to enable short name support on %ls",
+		      "Failed to enable short name support on %ls",
 		      volume + 4);
 	return false;
 }
@@ -1263,7 +1263,7 @@ remove_conflicting_short_name(const struct wim_dentry *dentry, struct win32_appl
 			    FILE_SHARE_VALID_FLAGS,
 			    FILE_OPEN_REPARSE_POINT | FILE_OPEN_FOR_BACKUP_INTENT);
 	if (!NT_SUCCESS(status)) {
-		winnt_warning(status, L"Can't open \"%ls\"", current_path(ctx));
+		winnt_warning(status, "Can't open \"%ls\"", current_path(ctx));
 		goto out;
 	}
 
@@ -1395,7 +1395,7 @@ retry:
 		return 0;
 	}
 
-	winnt_error(status, L"Can't set short name on \"%ls\"", current_path(ctx));
+	winnt_error(status, "Can't set short name on \"%ls\"", current_path(ctx));
 	return WIMLIB_ERR_SET_SHORT_NAME;
 }
 
@@ -1478,7 +1478,7 @@ retry:
 	}
 
 	if (unlikely(!NT_SUCCESS(status))) {
-		winnt_error(status, L"Can't open \"%ls\" for deletion "
+		winnt_error(status, "Can't open \"%ls\" for deletion "
 			    "(perms=%x, flags=%x)",
 			    current_path(ctx), (u32)perms, (u32)flags);
 		return WIMLIB_ERR_OPEN;
@@ -1493,7 +1493,7 @@ retry:
 					      FileBasicInformation);
 
 		if (!NT_SUCCESS(status)) {
-			winnt_error(status, L"Can't reset attributes of \"%ls\" "
+			winnt_error(status, "Can't reset attributes of \"%ls\" "
 				    "to prepare for deletion", current_path(ctx));
 			NtClose(h);
 			return WIMLIB_ERR_SET_ATTRIBUTES;
@@ -1505,7 +1505,7 @@ retry:
 					      sizeof(disp_info),
 					      FileDispositionInformation);
 		if (!NT_SUCCESS(status)) {
-			winnt_error(status, L"Can't set delete-on-close "
+			winnt_error(status, "Can't set delete-on-close "
 				    "disposition on \"%ls\"", current_path(ctx));
 			NtClose(h);
 			return WIMLIB_ERR_SET_ATTRIBUTES;
@@ -1514,7 +1514,7 @@ retry:
 
 	status = NtClose(h);
 	if (unlikely(!NT_SUCCESS(status))) {
-		winnt_error(status, L"Error closing \"%ls\" after setting "
+		winnt_error(status, "Error closing \"%ls\" after setting "
 			    "delete-on-close disposition", current_path(ctx));
 		return WIMLIB_ERR_OPEN;
 	}
@@ -1561,7 +1561,7 @@ retry:
 		retried = true;
 		goto retry;
 	}
-	winnt_error(status, L"Can't create \"%ls\"", current_path(ctx));
+	winnt_error(status, "Can't create \"%ls\"", current_path(ctx));
 	return WIMLIB_ERR_OPEN;
 }
 
@@ -1606,7 +1606,7 @@ do_set_reparse_point(const struct wim_dentry *dentry,
 	}
 
 fail:
-	winnt_error(status, L"Can't set reparse data on \"%ls\"",
+	winnt_error(status, "Can't set reparse data on \"%ls\"",
 		    current_path(ctx));
 	return WIMLIB_ERR_SET_REPARSE_DATA;
 }
@@ -1696,7 +1696,7 @@ create_directory(const struct wim_dentry *dentry, struct win32_apply_ctx *ctx)
 			     FILE_OPEN_IF, FILE_DIRECTORY_FILE, dentry, ctx);
 	if (unlikely(!NT_SUCCESS(status))) {
 		const wchar_t *path = current_path(ctx);
-		winnt_error(status, L"Can't create directory \"%ls\"", path);
+		winnt_error(status, "Can't create directory \"%ls\"", path);
 
 		/* Check for known issue with WindowsApps directory.  */
 		if (status == STATUS_ACCESS_DENIED &&
@@ -1862,7 +1862,7 @@ create_link(HANDLE h, const struct wim_dentry *dentry,
 					      FileLinkInformation);
 		if (NT_SUCCESS(status))
 			return 0;
-		winnt_error(status, L"Failed to create link \"%ls\"",
+		winnt_error(status, "Failed to create link \"%ls\"",
 			    current_path(ctx));
 		return WIMLIB_ERR_LINK;
 	} else {
@@ -2057,7 +2057,7 @@ begin_extract_blob_instance(const struct blob_descriptor *blob,
 					FILE_SYNCHRONOUS_IO_NONALERT,
 				ctx);
 	if (!NT_SUCCESS(status)) {
-		winnt_error(status, L"Can't open \"%ls\" for writing",
+		winnt_error(status, "Can't open \"%ls\" for writing",
 			    current_path(ctx));
 		return WIMLIB_ERR_OPEN;
 	}
@@ -2292,7 +2292,7 @@ retry:
 	build_extraction_path(dentry, ctx);
 
 	if (err != ERROR_SUCCESS) {
-		win32_error(err, L"Can't open \"%ls\" for encrypted import",
+		win32_error(err, "Can't open \"%ls\" for encrypted import",
 			    current_path(ctx));
 		return WIMLIB_ERR_OPEN;
 	}
@@ -2304,7 +2304,7 @@ retry:
 	CloseEncryptedFileRaw(rawctx);
 
 	if (err != ERROR_SUCCESS) {
-		win32_error(err, L"Can't import encrypted file \"%ls\"",
+		win32_error(err, "Can't import encrypted file \"%ls\"",
 			    current_path(ctx));
 		return WIMLIB_ERR_WRITE;
 	}
@@ -2376,7 +2376,7 @@ pwrite_to_handle(HANDLE h, const void *data, size_t size, u64 offset)
 				     &offs, NULL);
 		if (!NT_SUCCESS(status)) {
 			winnt_error(status,
-				    L"Error writing data to target volume");
+				    "Error writing data to target volume");
 			return WIMLIB_ERR_WRITE;
 		}
 	}
@@ -2678,7 +2678,7 @@ handle_system_compression(struct blob_descriptor *blob, struct win32_apply_ctx *
 
 		ctx->num_system_compression_failures++;
 		if (ctx->num_system_compression_failures < 10) {
-			winnt_warning(status, L"\"%ls\": Failed to compress "
+			winnt_warning(status, "\"%ls\": Failed to compress "
 				      "extracted file using System Compression",
 				      current_path(ctx));
 		} else if (ctx->num_system_compression_failures == 10) {
@@ -2711,7 +2711,7 @@ win32_end_extract_blob(struct blob_descriptor *blob, int status, void *_ctx)
 							&info, sizeof(info),
 							FileEndOfFileInformation);
 			if (!NT_SUCCESS(ntstatus)) {
-				winnt_error(ntstatus, L"Error writing data to "
+				winnt_error(ntstatus, "Error writing data to "
 					    "target volume (while extending)");
 				status = WIMLIB_ERR_WRITE;
 				break;
@@ -2817,7 +2817,7 @@ set_object_id(HANDLE h, const struct wim_inode *inode,
 
 	ctx->num_object_id_failures++;
 	if (ctx->num_object_id_failures < 10) {
-		winnt_warning(status, L"Can't set object ID on \"%ls\"",
+		winnt_warning(status, "Can't set object ID on \"%ls\"",
 			      current_path(ctx));
 	} else if (ctx->num_object_id_failures == 10) {
 		WARNING("Suppressing further warnings about failure to set "
@@ -2904,14 +2904,14 @@ set_xattrs(HANDLE h, const struct wim_inode *inode, struct win32_apply_ctx *ctx)
 			ctx->num_xattr_failures++;
 			if (ctx->num_xattr_failures < 5) {
 				winnt_warning(status,
-					      L"Can't set extended attributes on \"%ls\"",
+					      "Can't set extended attributes on \"%ls\"",
 					      current_path(ctx));
 			} else if (ctx->num_xattr_failures == 5) {
 				WARNING("Suppressing further warnings about "
 					"failure to set extended attributes.");
 			}
 		} else {
-			winnt_error(status, L"Can't set extended attributes on \"%ls\"",
+			winnt_error(status, "Can't set extended attributes on \"%ls\"",
 				    current_path(ctx));
 			ret = WIMLIB_ERR_SET_XATTR;
 			goto out;
@@ -3097,7 +3097,7 @@ do_apply_metadata_to_file(HANDLE h, const struct wim_inode *inode,
 		    (ctx->common.extract_flags & WIMLIB_EXTRACT_FLAG_STRICT_ACLS))
 		{
 			winnt_error(status,
-				    L"Can't set security descriptor on \"%ls\"",
+				    "Can't set security descriptor on \"%ls\"",
 				    current_path(ctx));
 			return WIMLIB_ERR_SET_SECURITY;
 		}
@@ -3125,7 +3125,7 @@ do_apply_metadata_to_file(HANDLE h, const struct wim_inode *inode,
 	    && !(status == STATUS_INVALID_PARAMETER &&
 		 dentry_is_root(inode_first_extraction_dentry(inode))))
 	{
-		winnt_error(status, L"Can't set basic metadata on \"%ls\"",
+		winnt_error(status, "Can't set basic metadata on \"%ls\"",
 			    current_path(ctx));
 		return WIMLIB_ERR_SET_ATTRIBUTES;
 	}
@@ -3168,7 +3168,7 @@ apply_metadata_to_file(const struct wim_dentry *dentry,
 				continue;
 			}
 		}
-		winnt_error(status, L"Can't open \"%ls\" to set metadata",
+		winnt_error(status, "Can't open \"%ls\" to set metadata",
 			    current_path(ctx));
 		return WIMLIB_ERR_OPEN;
 	}

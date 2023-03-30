@@ -77,10 +77,11 @@
  * arguments.  This is currently disabled on Windows because MinGW does not
  * support this attribute on functions taking wide-character strings.  */
 #ifdef _WIN32
-#  define _format_attribute(type, format_str, format_start)
+#  define _printf_format(fmtstr_idx, args_idx) \
+	__attribute__((format(gnu_printf, fmtstr_idx, args_idx)))
 #else
-#  define _format_attribute(type, format_str, format_start)	\
-			__attribute__((format(type, format_str, format_start)))
+#  define _printf_format(fmtstr_idx, args) \
+	__attribute__((format(printf, fmtstr_idx, args_idx)))
 #endif
 
 /* Endianness definitions.  Either CPU_IS_BIG_ENDIAN() or CPU_IS_LITTLE_ENDIAN()

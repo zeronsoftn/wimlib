@@ -7,22 +7,22 @@
 #include "wimlib/compiler.h"
 #include "wimlib/types.h"
 
-void _format_attribute(printf, 1, 2) __attribute__((cold))
-wimlib_error(const tchar *format, ...);
+void _printf_format(1, 2) __attribute__((cold))
+wimlib_error(const char *format, ...);
 
-void _format_attribute(printf, 1, 2) __attribute__((cold))
-wimlib_error_with_errno(const tchar *format, ...);
+void _printf_format(1, 2) __attribute__((cold))
+wimlib_error_with_errno(const char *format, ...);
 
-void _format_attribute(printf, 1, 2) __attribute__((cold))
-wimlib_warning(const tchar *format, ...);
+void _printf_format(1, 2) __attribute__((cold))
+wimlib_warning(const char *format, ...);
 
-void _format_attribute(printf, 1, 2) __attribute__((cold))
-wimlib_warning_with_errno(const tchar *format, ...);
+void _printf_format(1, 2) __attribute__((cold))
+wimlib_warning_with_errno(const char *format, ...);
 
-#define ERROR(format, ...)		wimlib_error(T(format), ## __VA_ARGS__)
-#define ERROR_WITH_ERRNO(format, ...)	wimlib_error_with_errno(T(format), ## __VA_ARGS__)
-#define WARNING(format, ...)		wimlib_warning(T(format), ## __VA_ARGS__)
-#define WARNING_WITH_ERRNO(format, ...)	wimlib_warning_with_errno(T(format), ## __VA_ARGS__)
+#define ERROR			wimlib_error
+#define ERROR_WITH_ERRNO	wimlib_error_with_errno
+#define WARNING			wimlib_warning
+#define WARNING_WITH_ERRNO	wimlib_warning_with_errno
 
 extern bool wimlib_print_errors;
 extern FILE *wimlib_error_file;

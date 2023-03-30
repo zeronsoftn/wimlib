@@ -55,7 +55,7 @@ bool thread_create(struct thread *t, void *(*thrproc)(void *), void *arg)
 	t->arg = arg;
 	h = CreateThread(NULL, 0, win32_thrproc, (LPVOID)t, 0, NULL);
 	if (h == NULL) {
-		win32_error(GetLastError(), L"Failed to create thread");
+		win32_error(GetLastError(), "Failed to create thread");
 		return false;
 	}
 	t->win32_thread = (void *)h;
