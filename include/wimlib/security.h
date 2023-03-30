@@ -1,7 +1,7 @@
 #ifndef _WIMLIB_SECURITY_H
 #define _WIMLIB_SECURITY_H
 
-#include "wimlib/types.h"
+#include "common_defs.h"
 
 struct wim_security_data;
 struct avl_tree_node;

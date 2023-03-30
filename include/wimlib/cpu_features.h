@@ -1,7 +1,7 @@
 #ifndef _WIMLIB_CPU_FEATURES_H
 #define _WIMLIB_CPU_FEATURES_H
 
-#include "wimlib/types.h"
+#include "common_defs.h"
 
 #define X86_CPU_FEATURE_SSSE3		0x00000001
 #define X86_CPU_FEATURE_SSE4_1		0x00000002

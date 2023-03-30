@@ -1,12 +1,10 @@
 #ifndef _WIMLIB_APPLY_H
 #define _WIMLIB_APPLY_H
 
-#include "wimlib/compiler.h"
+#include "common_defs.h"
 #include "wimlib/file_io.h"
 #include "wimlib/list.h"
 #include "wimlib/progress.h"
-#include "wimlib/types.h"
-#include "wimlib.h"
 
 /* These can be treated as counts (for required_features) or booleans (for
  * supported_features).  */

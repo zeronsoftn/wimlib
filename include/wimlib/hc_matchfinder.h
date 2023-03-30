@@ -119,8 +119,6 @@
  * ----------------------------------------------------------------------------
  */
 
-#include <string.h>
-
 #include "wimlib/matchfinder_common.h"
 
 #define HC_MATCHFINDER_HASH3_ORDER	15

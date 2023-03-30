@@ -3,7 +3,7 @@
 
 #include <sys/types.h>
 
-#include "wimlib/types.h"
+#include "common_defs.h"
 
 #define WIM_INTEGRITY_OK 0
 #define WIM_INTEGRITY_NOT_OK -1

@@ -7,8 +7,8 @@
 #ifndef _LZX_COMMON_H
 #define _LZX_COMMON_H
 
+#include "common_defs.h"
 #include "wimlib/lzx_constants.h"
-#include "wimlib/types.h"
 
 extern const s32 lzx_offset_slot_base[LZX_MAX_OFFSET_SLOTS + 1];
 

@@ -29,7 +29,7 @@
 #ifndef _AVL_TREE_H_
 #define _AVL_TREE_H_
 
-#include "wimlib/types.h"
+#include "common_defs.h"
 #define AVL_INLINE forceinline
 
 /* Node in an AVL tree.  Embed this in some other data structure.  */

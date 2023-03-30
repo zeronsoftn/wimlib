@@ -31,8 +31,7 @@
 #ifndef _WOF_H_
 #define _WOF_H_
 
-#include "wimlib/compiler.h"
-#include "wimlib/types.h"
+#include "common_defs.h"
 
 #ifdef _WIN32
 

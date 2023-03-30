@@ -1,7 +1,7 @@
 #ifndef _WIMLIB_SCAN_H
 #define _WIMLIB_SCAN_H
 
-#include "wimlib.h"
+#include "common_defs.h"
 #include "wimlib/inode_table.h"
 #include "wimlib/list.h"
 #include "wimlib/progress.h"

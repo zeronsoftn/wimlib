@@ -1,11 +1,9 @@
 #ifndef _WIMLIB_HEADER_H
 #define _WIMLIB_HEADER_H
 
-#include <limits.h>
-
+#include "common_defs.h"
 #include "wimlib/guid.h"
 #include "wimlib/resource.h"
-#include "wimlib/types.h"
 
 /* Length of the WIM header on disk.  wimlib currently requires that the header
  * be exactly this size.  */

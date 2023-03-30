@@ -62,9 +62,6 @@
  * ----------------------------------------------------------------------------
  */
 
-
-#include <string.h>
-
 #include "wimlib/matchfinder_common.h"
 
 #define BT_MATCHFINDER_HASH3_ORDER 15

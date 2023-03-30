@@ -1,7 +1,7 @@
 #ifndef _WIMLIB_PATHLIST_H
 #define _WIMLIB_PATHLIST_H
 
-#include "wimlib/types.h"
+#include "common_defs.h"
 
 int
 read_path_list_file(const tchar *listfile,

@@ -7,7 +7,7 @@
 #ifndef _WIMLIB_COMPRESS_COMMON_H
 #define _WIMLIB_COMPRESS_COMMON_H
 
-#include "wimlib/types.h"
+#include "common_defs.h"
 
 #define MAX_NUM_SYMS		799	/* LZMS_MAX_NUM_SYMS */
 #define MAX_CODEWORD_LEN	16

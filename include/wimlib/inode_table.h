@@ -1,9 +1,8 @@
 #ifndef _WIMLIB_INODE_TABLE_H
 #define _WIMLIB_INODE_TABLE_H
 
+#include "common_defs.h"
 #include "wimlib/list.h"
-#include "wimlib/types.h"
-#include "wimlib/util.h"
 
 struct wim_dentry;
 

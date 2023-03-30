@@ -1,10 +1,10 @@
 #ifndef _WIMLIB_BLOB_TABLE_H
 #define _WIMLIB_BLOB_TABLE_H
 
+#include "common_defs.h"
 #include "wimlib/list.h"
 #include "wimlib/resource.h"
 #include "wimlib/sha1.h"
-#include "wimlib/types.h"
 
 /* An enumerated type that identifies where a blob's data is located.  */
 enum blob_location {

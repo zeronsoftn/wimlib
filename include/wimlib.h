@@ -457,10 +457,7 @@ struct wimlib_timespec {
  * Opaque structure that represents a WIM, possibly backed by an on-disk file.
  * See @ref sec_basic_wim_handling_concepts for more information.
  */
-#ifndef WIMLIB_WIMSTRUCT_DECLARED
 typedef struct WIMStruct WIMStruct;
-#define WIMLIB_WIMSTRUCT_DECLARED
-#endif
 
 #ifdef _WIN32
 typedef wchar_t wimlib_tchar;

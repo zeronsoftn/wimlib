@@ -3,9 +3,7 @@
 
 #include <stdio.h>
 
-#include "wimlib.h" /* Get error code definitions */
-#include "wimlib/compiler.h"
-#include "wimlib/types.h"
+#include "common_defs.h"
 
 void _format_attribute(printf, 1, 2) __attribute__((cold))
 wimlib_error(const tchar *format, ...);

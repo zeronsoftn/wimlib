@@ -7,9 +7,8 @@
 #ifndef _LZMS_COMMON_H
 #define _LZMS_COMMON_H
 
-#include "wimlib/compiler.h"
+#include "common_defs.h"
 #include "wimlib/lzms_constants.h"
-#include "wimlib/types.h"
 
 /* Offset slot tables  */
 extern const u32 lzms_offset_slot_base[LZMS_MAX_NUM_OFFSET_SYMS + 1];

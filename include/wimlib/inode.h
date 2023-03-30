@@ -1,10 +1,10 @@
 #ifndef _WIMLIB_INODE_H
 #define _WIMLIB_INODE_H
 
+#include "common_defs.h"
 #include "wimlib/assert.h"
 #include "wimlib/list.h"
 #include "wimlib/sha1.h"
-#include "wimlib/types.h"
 
 struct avl_tree_node;
 struct blob_descriptor;

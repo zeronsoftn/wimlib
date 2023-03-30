@@ -1,12 +1,11 @@
 #ifndef _WIMLIB_DENTRY_H
 #define _WIMLIB_DENTRY_H
 
+#include "common_defs.h"
 #include "wimlib/avl_tree.h"
 #include "wimlib/case.h"
-#include "wimlib/compiler.h"
 #include "wimlib/inode.h"
 #include "wimlib/list.h"
-#include "wimlib/types.h"
 
 struct wim_inode;
 struct blob_table;

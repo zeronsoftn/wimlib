@@ -1,11 +1,8 @@
 #ifndef _WIMLIB_ENCODING_H
 #define _WIMLIB_ENCODING_H
 
-#include <string.h>
-
+#include "common_defs.h"
 #include "wimlib/error.h"
-#include "wimlib/util.h"
-#include "wimlib/types.h"
 
 /* String conversion functions */
 

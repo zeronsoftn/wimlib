@@ -7,7 +7,7 @@
 
 #ifdef _WIN32
 
-#include "wimlib/types.h"
+#include "common_defs.h"
 
 struct blob_descriptor;
 struct consume_chunk_callback;

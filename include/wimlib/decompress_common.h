@@ -30,11 +30,7 @@
 #ifndef _WIMLIB_DECOMPRESS_COMMON_H
 #define _WIMLIB_DECOMPRESS_COMMON_H
 
-#include <string.h>
-
-#include "wimlib/compiler.h"
-#include "wimlib/types.h"
-#include "wimlib/unaligned.h"
+#include "common_defs.h"
 
 /******************************************************************************/
 /*                   Input bitstream for XPRESS and LZX                       */

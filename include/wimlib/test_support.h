@@ -3,8 +3,7 @@
 
 #ifdef ENABLE_TEST_SUPPORT
 
-#include "wimlib.h"
-#include "wimlib/types.h"
+#include "common_defs.h"
 
 #define WIMLIB_ERR_IMAGES_ARE_DIFFERENT			200
 

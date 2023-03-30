@@ -1,9 +1,9 @@
 #ifndef _WIMLIB_RESOURCE_H
 #define _WIMLIB_RESOURCE_H
 
+#include "common_defs.h"
 #include "wimlib/list.h"
 #include "wimlib/sha1.h"
-#include "wimlib/types.h"
 
 struct blob_descriptor;
 struct filedes;

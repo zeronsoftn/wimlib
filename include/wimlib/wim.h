@@ -5,7 +5,7 @@
 #ifndef _WIMLIB_WIM_H
 #define _WIMLIB_WIM_H
 
-#include "wimlib.h"
+#include "common_defs.h"
 #include "wimlib/file_io.h"
 #include "wimlib/header.h"
 #include "wimlib/list.h"

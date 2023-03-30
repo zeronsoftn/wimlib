@@ -1,8 +1,7 @@
 #ifndef _WIMLIB_PATHS_H
 #define _WIMLIB_PATHS_H
 
-#include "wimlib/compiler.h"
-#include "wimlib/types.h"
+#include "common_defs.h"
 
 const tchar *
 path_basename(const tchar *path);

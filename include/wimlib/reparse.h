@@ -1,8 +1,8 @@
 #ifndef _WIMLIB_REPARSE_H
 #define _WIMLIB_REPARSE_H
 
+#include "common_defs.h"
 #include "wimlib/inode.h" /* for reparse tag definitions */
-#include "wimlib/types.h"
 
 struct blob_descriptor;
 struct blob_table;

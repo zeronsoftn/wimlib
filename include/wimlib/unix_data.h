@@ -1,7 +1,7 @@
 #ifndef _WIMLIB_UNIX_DATA_H
 #define _WIMLIB_UNIX_DATA_H
 
-#include "wimlib/types.h"
+#include "common_defs.h"
 
 struct wimlib_unix_data {
 	u32 uid;

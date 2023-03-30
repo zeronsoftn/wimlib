@@ -7,7 +7,7 @@
 #ifndef _WIMLIB_DECOMPRESSOR_OPS_H
 #define _WIMLIB_DECOMPRESSOR_OPS_H
 
-#include <stddef.h>
+#include "common_defs.h"
 
 struct decompressor_ops {
 

@@ -28,10 +28,7 @@
 #ifndef _WIMLIB_SHA1_H
 #define _WIMLIB_SHA1_H
 
-#include <string.h>
-
-#include "wimlib/types.h"
-#include "wimlib/util.h"
+#include "common_defs.h"
 
 #define SHA1_HASH_SIZE	20
 #define SHA1_BLOCK_SIZE	64

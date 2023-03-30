@@ -10,7 +10,7 @@
 #include <sys/time.h>
 #include <time.h>
 
-#include "wimlib/types.h"
+#include "common_defs.h"
 
 struct wimlib_timespec;
 

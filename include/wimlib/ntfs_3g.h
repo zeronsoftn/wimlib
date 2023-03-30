@@ -3,7 +3,7 @@
 
 #ifdef WITH_NTFS_3G
 
-#include "wimlib/types.h"
+#include "common_defs.h"
 
 struct blob_descriptor;
 struct consume_chunk_callback;

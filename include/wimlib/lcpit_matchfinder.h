@@ -31,7 +31,7 @@
 #ifndef _LCPIT_MATCHFINDER_H
 #define _LCPIT_MATCHFINDER_H
 
-#include "wimlib/types.h"
+#include "common_defs.h"
 
 struct lcpit_matchfinder {
 	bool huge_mode;

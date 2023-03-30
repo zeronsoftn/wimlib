@@ -1,7 +1,7 @@
 #ifndef _WIMLIB_TAGGED_ITEMS_H
 #define _WIMLIB_TAGGED_ITEMS_H
 
-#include "wimlib/types.h"
+#include "common_defs.h"
 
 struct wim_inode;
 

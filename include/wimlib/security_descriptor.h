@@ -28,8 +28,7 @@
 #ifndef _WIMLIB_SECURITY_DESCRIPTOR_H
 #define _WIMLIB_SECURITY_DESCRIPTOR_H
 
-#include "wimlib/compiler.h"
-#include "wimlib/types.h"
+#include "common_defs.h"
 
 /* Note: the data types in this header are prefixed with wimlib_ to avoid
  * conflicts with the same types being defined in the libntfs-3g headers.  */

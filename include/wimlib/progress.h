@@ -1,9 +1,8 @@
 #ifndef _WIMLIB_PROGRESS_H
 #define _WIMLIB_PROGRESS_H
 
-#include "wimlib.h"
+#include "common_defs.h"
 #include "wimlib/paths.h"
-#include "wimlib/types.h"
 
 /* If specified, call the user-provided progress function and check its result.
  */

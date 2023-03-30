@@ -1,7 +1,7 @@
 #ifndef _WIMLIB_PATTERN_H
 #define _WIMLIB_PATTERN_H
 
-#include "wimlib/types.h"
+#include "common_defs.h"
 
 struct wim_dentry;
 

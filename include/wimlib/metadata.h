@@ -1,9 +1,9 @@
 #ifndef _WIMLIB_METADATA_H
 #define _WIMLIB_METADATA_H
 
+#include "common_defs.h"
 #include "wimlib/blob_table.h"
 #include "wimlib/list.h"
-#include "wimlib/types.h"
 #include "wimlib/wim.h"
 
 /*

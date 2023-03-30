@@ -28,8 +28,7 @@
 #ifndef _WIMLIB_MATCHFINDER_COMMON_H
 #define _WIMLIB_MATCHFINDER_COMMON_H
 
-#include "wimlib/bitops.h"
-#include "wimlib/unaligned.h"
+#include "common_defs.h"
 
 /*
  * Given a 32-bit value that was loaded with the platform's native endianness,

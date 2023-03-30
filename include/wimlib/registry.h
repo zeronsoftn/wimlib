@@ -1,7 +1,7 @@
 #ifndef _WIMLIB_REGISTRY_H
 #define _WIMLIB_REGISTRY_H
 
-#include "wimlib/types.h"
+#include "common_defs.h"
 
 struct regf;
 

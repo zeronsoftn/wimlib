@@ -1,9 +1,9 @@
 #ifndef _WIMBOOT_H_
 #define _WIMBOOT_H_
 
+#include "common_defs.h"
 #include "wimlib/header.h"
 #include "wimlib/sha1.h"
-#include "wimlib/types.h"
 #include "wimlib/win32_common.h"
 
 struct blob_descriptor;

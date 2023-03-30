@@ -1,8 +1,7 @@
 #ifndef _WIMLIB_WRITE_H
 #define _WIMLIB_WRITE_H
 
-#include "wimlib.h"
-#include "wimlib/types.h"
+#include "common_defs.h"
 
 /* Internal use only */
 #define WIMLIB_WRITE_FLAG_FILE_DESCRIPTOR		0x80000000
