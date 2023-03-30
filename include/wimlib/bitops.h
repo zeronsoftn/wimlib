@@ -40,8 +40,8 @@
 static forceinline unsigned
 bsr32(u32 v)
 {
-#ifdef compiler_bsr32
-	return compiler_bsr32(v);
+#if defined(__GNUC__) || __has_builtin(__builtin_clz)
+	return 31 - __builtin_clz(v);
 #else
 	unsigned bit = 0;
 	while ((v >>= 1) != 0)
@@ -53,8 +53,8 @@ bsr32(u32 v)
 static forceinline unsigned
 bsr64(u64 v)
 {
-#ifdef compiler_bsr64
-	return compiler_bsr64(v);
+#if defined(__GNUC__) || __has_builtin(__builtin_clzll)
+	return 63 - __builtin_clzll(v);
 #else
 	unsigned bit = 0;
 	while ((v >>= 1) != 0)
@@ -82,8 +82,8 @@ bsrw(machine_word_t v)
 static forceinline unsigned
 bsf32(u32 v)
 {
-#ifdef compiler_bsf32
-	return compiler_bsf32(v);
+#if defined(__GNUC__) || __has_builtin(__builtin_ctz)
+	return __builtin_ctz(v);
 #else
 	unsigned bit;
 	for (bit = 0; !(v & 1); bit++, v >>= 1)
@@ -95,8 +95,8 @@ bsf32(u32 v)
 static forceinline unsigned
 bsf64(u64 v)
 {
-#ifdef compiler_bsf64
-	return compiler_bsf64(v);
+#if defined(__GNUC__) || __has_builtin(__builtin_ctzll)
+	return __builtin_ctzll(v);
 #else
 	unsigned bit;
 	for (bit = 0; !(v & 1); bit++, v >>= 1)

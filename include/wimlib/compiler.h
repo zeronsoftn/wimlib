@@ -73,24 +73,6 @@
 /* Prefetch into L1 cache for write.  */
 #define prefetchw(addr)		__builtin_prefetch((addr), 1)
 
-/* Declare that the members of the annotated struct are tightly packed, and the
- * struct itself may be misaligned.  */
-#define _packed_attribute	__attribute__((packed))
-
-/* Declare that the annotated variable, or variables of the annotated type, are
- * to be aligned on n-byte boundaries.  */
-#define _aligned_attribute(n)	__attribute__((aligned(n)))
-
-/* Declare that pointers to the annotated type may alias other pointers.  */
-#define _may_alias_attribute	__attribute__((may_alias))
-
-/* Hint that the annotated function is rarely called.  */
-#if GCC_PREREQ(4, 4) || __has_attribute(cold)
-#  define _cold_attribute	__attribute__((cold))
-#else
-#  define _cold_attribute
-#endif
-
 /* Hint that the annotated function takes a printf()-like format string and
  * arguments.  This is currently disabled on Windows because MinGW does not
  * support this attribute on functions taking wide-character strings.  */
@@ -100,10 +82,6 @@
 #  define _format_attribute(type, format_str, format_start)	\
 			__attribute__((format(type, format_str, format_start)))
 #endif
-
-/* Hint that the annotated function is intentionally not used.  This might be
- * the case if the function contains only static assertions.  */
-#define _unused_attribute	__attribute__((unused))
 
 /* Endianness definitions.  Either CPU_IS_BIG_ENDIAN() or CPU_IS_LITTLE_ENDIAN()
  * evaluates to 1.  The other evaluates to 0.  Note that newer gcc supports
@@ -151,27 +129,6 @@
 #  define swap(a, b) ({ typeof(a) _a = (a); (a) = (b); (b) = _a; })
 #endif
 #define SWAP(a, b)	swap((a), (b))
-
-/* (Optional) Efficiently swap the bytes of a 16-bit integer.  */
-#if GCC_PREREQ(4, 8) || __has_builtin(__builtin_bswap16)
-#  define compiler_bswap16 __builtin_bswap16
-#endif
-
-/* (Optional) Efficiently swap the bytes of a 32-bit integer.  */
-#if GCC_PREREQ(4, 3) || __has_builtin(__builtin_bswap32)
-#  define compiler_bswap32 __builtin_bswap32
-#endif
-
-/* (Optional) Efficiently swap the bytes of a 64-bit integer.  */
-#if GCC_PREREQ(4, 3) || __has_builtin(__builtin_bswap64)
-#  define compiler_bswap64 __builtin_bswap64
-#endif
-
-/* (Optional) Find Last Set bit and Find First Set bit macros.  */
-#define compiler_bsr32(n)	(31 - __builtin_clz(n))
-#define compiler_bsr64(n)	(63 - __builtin_clzll(n))
-#define compiler_bsf32(n)	__builtin_ctz(n)
-#define compiler_bsf64(n)	__builtin_ctzll(n)
 
 /* Optional definitions for checking with 'sparse'.  */
 #ifdef __CHECKER__
