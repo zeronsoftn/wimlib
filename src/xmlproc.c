@@ -59,6 +59,7 @@ xml_new_node(struct xml_node *parent, enum xml_node_type type,
 		return NULL;
 	node->type = type;
 	INIT_LIST_HEAD(&node->children);
+	INIT_LIST_HEAD(&node->sibling_link);
 	if (name) {
 		node->name = tstrdupz(name, name_len);
 		if (!node->name)
@@ -104,25 +105,6 @@ xml_new_element_with_text(struct xml_node *parent, const tchar *name,
 		return NULL;
 	}
 	return element;
-}
-
-/* Append @child to the children list of @parent. */
-void
-xml_add_child(struct xml_node *parent, struct xml_node *child)
-{
-	xml_unlink_node(child);	/* Shouldn't be needed, but be safe. */
-	child->parent = parent;
-	list_add_tail(&child->sibling_link, &parent->children);
-}
-
-/* Unlink @node from its parent, if it has one. */
-void
-xml_unlink_node(struct xml_node *node)
-{
-	if (node->parent) {
-		list_del(&node->sibling_link);
-		node->parent = NULL;
-	}
 }
 
 static void
@@ -245,15 +227,13 @@ xml_replace_child(struct xml_node *parent, struct xml_node *replacement)
 {
 	struct xml_node *child;
 
-	xml_unlink_node(replacement); /* Shouldn't be needed, but be safe. */
-
 	xml_node_for_each_child(parent, child) {
 		if (child->type == replacement->type &&
 		    !tstrcmp(child->name, replacement->name)) {
+			list_del(&replacement->sibling_link);
 			list_replace(&child->sibling_link,
 				     &replacement->sibling_link);
-			replacement->parent = parent;
-			child->parent = NULL;
+			INIT_LIST_HEAD(&child->sibling_link);
 			xml_free_node(child);
 			return;
 		}

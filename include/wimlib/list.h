@@ -104,6 +104,13 @@ list_del(struct list_head *entry)
 	next->prev = prev;
 }
 
+static inline void
+list_del_init(struct list_head *entry)
+{
+	list_del(entry);
+	INIT_LIST_HEAD(entry);
+}
+
 /**
  * list_empty - tests whether a list is empty
  * @head: the list to test.

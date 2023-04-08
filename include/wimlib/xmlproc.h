@@ -16,9 +16,11 @@ struct xml_node {
 	enum xml_node_type type;	/* type of node */
 	tchar *name;			/* name of ELEMENT or ATTRIBUTE */
 	tchar *value;			/* value of TEXT or ATTRIBUTE */
-	struct xml_node *parent;	/* parent, or NULL if none */
 	struct list_head children;	/* children; only used for ELEMENT */
-	struct list_head sibling_link;
+	struct list_head sibling_link;	/*
+					 * link in parent's siblings list, or an
+					 * empty list if this node is unlinked
+					 */
 };
 
 /* Iterate through the children of an xml_node.  Does nothing if passed NULL. */
@@ -38,11 +40,19 @@ struct xml_node *
 xml_new_element_with_text(struct xml_node *parent, const tchar *name,
 			  const tchar *text);
 
-void
-xml_add_child(struct xml_node *parent, struct xml_node *child);
+/* Append @child to the children list of @parent. */
+static inline void
+xml_add_child(struct xml_node *parent, struct xml_node *child)
+{
+	list_move_tail(&child->sibling_link, &parent->children);
+}
 
-void
-xml_unlink_node(struct xml_node *node);
+/* Unlink @node from its parent, if it has one. */
+static inline void
+xml_unlink_node(struct xml_node *node)
+{
+	list_del_init(&node->sibling_link);
+}
 
 void
 xml_free_node(struct xml_node *node);
