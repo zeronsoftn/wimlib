@@ -1142,12 +1142,35 @@ assign_stream_types_encrypted(struct wim_inode *inode)
 {
 	for (unsigned i = 0; i < inode->i_num_streams; i++) {
 		struct wim_inode_stream *strm = &inode->i_streams[i];
+		printf("[enc] %u%s%02x%02x...\n",
+		       i, (stream_is_named(strm) ? "named " : ""),
+		       strm->_stream_hash[0], strm->_stream_hash[1]);
+	}
+
+	for (unsigned i = 0; i < inode->i_num_streams; i++) {
+		struct wim_inode_stream *strm = &inode->i_streams[i];
 		if (!stream_is_named(strm) && !is_zero_hash(strm->_stream_hash))
 		{
 			strm->stream_type = STREAM_TYPE_EFSRPC_RAW_DATA;
 			return;
 		}
 	}
+}
+
+static const char *
+stream_type_name(const struct wim_inode_stream *strm)
+{
+	switch (strm->stream_type) {
+	case STREAM_TYPE_DATA:
+		return "data";
+	case STREAM_TYPE_REPARSE_POINT:
+		return "reparse";
+	case STREAM_TYPE_EFSRPC_RAW_DATA:
+		return "efs";
+	case STREAM_TYPE_UNKNOWN:
+		return "unknown";
+	}
+	return "???";
 }
 
 /*
@@ -1187,6 +1210,10 @@ assign_stream_types_unencrypted(struct wim_inode *inode)
 	bool found_reparse_stream = false;
 	bool found_unnamed_data_stream = false;
 
+	printf("\ndir=%d reparse=%d\n",
+	       !!(inode->i_attributes&FILE_ATTRIBUTE_DIRECTORY),
+	       !!(inode->i_attributes&FILE_ATTRIBUTE_REPARSE_POINT));
+
 	for (unsigned i = 0; i < inode->i_num_streams; i++) {
 		struct wim_inode_stream *strm = &inode->i_streams[i];
 
@@ -1213,6 +1240,21 @@ assign_stream_types_unencrypted(struct wim_inode *inode)
 			(inode->i_attributes & FILE_ATTRIBUTE_REPARSE_POINT) ?
 			STREAM_TYPE_REPARSE_POINT : STREAM_TYPE_DATA;
 	}
+
+	for (unsigned i = 0; i < inode->i_num_streams; i++) {
+		const struct wim_inode_stream *strm = &inode->i_streams[i];
+
+		if (i == 0)
+			printf("main: %s %02x%02x...\n",
+			       stream_type_name(strm),
+			       strm->_stream_hash[0], strm->_stream_hash[1]);
+		else
+			printf("stream %u: %s %s%02x%02x...\n",
+			       i, stream_type_name(strm),
+			       (stream_is_named(strm) ? "named " : ""),
+			       strm->_stream_hash[0], strm->_stream_hash[1]);
+	}
+
 }
 
 /*
