@@ -54,3 +54,5 @@
 /wimlib-imagex
 /wimlib-imagex.exe
 /wimlib.pc
+
+.vscode/
