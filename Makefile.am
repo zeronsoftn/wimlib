@@ -182,6 +182,7 @@ libwim_la_SOURCES += src/wimboot.c			\
 PLATFORM_LIBS = -lntdll
 else
 libwim_la_SOURCES += src/unix_apply.c		\
+			 src/unix_with_attr_apply.c		\
 		     src/unix_capture.c
 PLATFORM_LIBS =
 endif
