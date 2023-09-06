@@ -2075,6 +2075,10 @@ typedef int (*wimlib_iterate_lookup_table_callback_t)(const struct wimlib_resour
  */
 #define WIMLIB_EXTRACT_FLAG_WIMBOOT			0x00400000
 
+/** Extract using extended attributes provided by ntfs-3g driver.
+*/
+#define WIMLIB_EXTRACT_FLAG_UNIX_WITH_NTFS_3G_XATTR 0x00800000
+
 /**
  * Since wimlib v1.8.2 and Windows-only: compress the extracted files using
  * System Compression, when possible.  This only works on either Windows 10 or
@@ -2121,6 +2125,8 @@ typedef int (*wimlib_iterate_lookup_table_callback_t)(const struct wimlib_resour
 
 /** Support UNIX owners, groups, modes, and special files.  */
 #define WIMLIB_MOUNT_FLAG_UNIX_DATA			0x00000020
+
+/** Support ntfs-3g extended attributes for setting ntfs specific data from, */
 
 /** Allow other users to see the mounted filesystem.  This passes the @c
  * allow_other option to fuse_main().  */
