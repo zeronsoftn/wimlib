@@ -246,8 +246,8 @@ unix_build_inode_extraction_path(const struct wim_inode *inode,
 }
 
 /* Should the specified file be extracted as a directory on UNIX?  We extract
- * the file as a directory if FILE_ATTRIBUTE_DIRECTORY is set and the file does
- * not have a symlink or junction reparse point.  It *may* have a different type
+ *  the file as a directory if FILE_ATTRIBUTE_DIRECTORY is set and even when FILE_ATTRIBUTE_REPARSE_POINT is set
+    as ntfs-3g driver process reparse points to symlinks in unix. It *may* have a different type
  * of reparse point.  */
 static inline bool
 should_extract_as_directory(const struct wim_inode *inode)
@@ -386,7 +386,7 @@ apply_linux_xattrs(int fd, const struct wim_inode *inode,
 						 path, name);
 				return WIMLIB_ERR_SET_XATTR;
 			}
-			WARNING_WITH_ERRNO("\"%s\": unable to set extended attribute \"%s\"",
+			ERROR_WITH_ERRNO("\"%s\": unable to set extended attribute \"%s\"",
 					   path, name);
 		}
 	}
@@ -508,28 +508,29 @@ unix_set_metadata(int fd, const struct wim_inode *inode,
 		WARNING_WITH_ERRNO("\"%s\": unable to set timestamps", path);
 	}
 
-	//TODO: apply ntfs attributes with getxattr & setxattr
-
 	//* set ntfs file attribute with ntfs-3g attribute - compression attribute handled here?
-	ret = lsetxattr(path, "system.ntfs_attrib", &inode->i_attributes, sizeof(inode->i_attributes), 0);
+	ret =  fd > 0 ? fsetxattr(fd, "system.ntfs_attrib", &inode->i_attributes, sizeof(inode->i_attributes), 0) : 
+	lsetxattr(path, "system.ntfs_attrib", &inode->i_attributes, sizeof(inode->i_attributes), 0);
 	if (ret) {
 		WARNING_WITH_ERRNO("\"%s\": unable to set ntfs attributes", path);
 	}
 
 	//* set ntfs file time with ntfs-3g attribute - automatically set when setting unix timestamp in ntfs-3g mount point?
 	u64 buf[4] = { inode->i_creation_time, inode->i_last_write_time, inode->i_last_access_time, (u64)0 };
-	ret = lsetxattr(path, "system.ntfs_times", buf, sizeof(buf), 0);
+	ret = fd > 0 ? fsetxattr(fd, "system.ntfs_times", buf, sizeof(buf), 0) : 
+	lsetxattr(path, "system.ntfs_times", buf, sizeof(buf), 0);
 	if (ret) {
 		WARNING_WITH_ERRNO("\"%s\": unable to set ntfs timestamp", path);
 	}
- 
+
 	//* set ntfs object id with ntfs-3g attribute
 	const void *object_id;
 	u32 len;
 
 	object_id = inode_get_object_id(inode, &len);
 	if (unlikely(object_id != NULL)) {
-		ret = lsetxattr(path, "system.ntfs_object_id", object_id, len, 0);
+		ret = fd > 0 ? fsetxattr(fd, "system.ntfs_object_id", object_id, len, 0) : 
+		lsetxattr(path, "system.ntfs_object_id", object_id, len, 0);
 		if (ret) {
 			WARNING_WITH_ERRNO("\"%s\": unable to set ntfs object id", path);
 		}
@@ -540,7 +541,8 @@ unix_set_metadata(int fd, const struct wim_inode *inode,
 
 	entries = inode_get_xattrs(inode, &len);
 	if (unlikely(entries != NULL && len != 0)) {
-		ret = lsetxattr(path, "system.ntfs_ea", entries, len, 0);
+		ret = fd > 0 ? fsetxattr(fd, "system.ntfs_ea", entries, len, 0) : 
+		lsetxattr(path, "system.ntfs_ea", object_id, len, 0);
 		if (ret) {
 			WARNING_WITH_ERRNO("\"%s\": unable to set ntfs extended attribute(EA)", path);
 		}
@@ -558,7 +560,8 @@ unix_set_metadata(int fd, const struct wim_inode *inode,
 		desc = sd->descriptors[inode->i_security_id];
 		desc_size = sd->sizes[inode->i_security_id];
 
-		ret = lsetxattr(path, "system.ntfs_acl", desc, desc_size, 0);
+		ret = fd > 0 ? fsetxattr(fd, "system.ntfs_acl", desc, desc_size, 0) : 
+		lsetxattr(path, "system.ntfs_acl", desc, desc_size, 0);
 		if (ret) {
 			WARNING_WITH_ERRNO("Can't set security descriptor on \"%s\"", path);
 		}
@@ -592,6 +595,53 @@ unix_create_hardlinks(const struct wim_inode *inode,
 		}
 		unix_reuse_pathbuf(ctx);
 	}
+	return 0;
+}
+
+/* Prepare file or directory to be used for reparse point
+	as ntfs-3g needs a file entry to inject extended attribute. */
+static int
+unix_prepare_reparse_points(const struct wim_dentry *dentry,
+			 struct unix_with_attr_apply_ctx *ctx)
+{
+	const char *path;
+	struct stat stbuf;
+	int ret;
+
+	path = unix_build_extraction_path(dentry, ctx);
+
+	if (inode_is_symlink(dentry->d_inode)) {
+		if (dentry->d_inode->i_attributes & FILE_ATTRIBUTE_DIRECTORY)
+		{
+			if (mkdir(path, 0755) &&
+				!errno == EEXIST && !lstat(path, &stbuf) && S_ISDIR(stbuf.st_mode))
+				{
+					ERROR_WITH_ERRNO("Can't create directory \"%s\"", path);
+					return WIMLIB_ERR_MKDIR;
+				}
+		}
+		else
+		{
+			int fd;
+
+retry_create:
+			fd = open(path, O_EXCL | O_CREAT | O_WRONLY | O_NOFOLLOW, 0644);
+			if (fd < 0) {
+				if (errno == EEXIST && !unlink(path))
+					goto retry_create;
+				ERROR_WITH_ERRNO("Can't create regular file \"%s\"", path);
+				return WIMLIB_ERR_OPEN;
+			}
+			/* On empty files, we can set timestamps immediately because we
+			* don't need to write any data to them.  */
+			ret = unix_set_metadata(fd, dentry->d_inode, path, ctx);
+			if (close(fd) && !ret) {
+				ERROR_WITH_ERRNO("Error closing \"%s\"", path);
+				ret = WIMLIB_ERR_WRITE;
+			}
+		}
+	}
+
 	return 0;
 }
 
@@ -749,6 +799,11 @@ unix_create_dirs_and_empty_files(const struct list_head *dentry_list,
 	}
 	list_for_each_entry(dentry, dentry_list, d_extraction_list_node) {
 		ret = unix_extract_if_empty_file(dentry, ctx);
+		if (ret)
+			return ret;
+	}
+	list_for_each_entry(dentry, dentry_list, d_extraction_list_node) {
+		ret = unix_prepare_reparse_points(dentry, ctx);
 		if (ret)
 			return ret;
 	}
@@ -930,7 +985,7 @@ extract_encrypted_file(const struct wim_dentry *dentry,
 
 	path = unix_build_extraction_path(dentry, ctx);
 
-
+	// *TODO
 	return 0;
 }
 
