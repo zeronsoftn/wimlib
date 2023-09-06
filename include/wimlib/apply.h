@@ -271,6 +271,7 @@ struct apply_operations {
 #ifdef _WIN32
   extern const struct apply_operations win32_apply_ops;
 #else
+  extern const struct apply_operations unix_with_attr_apply_ops; 
   extern const struct apply_operations unix_apply_ops;
 #endif
 

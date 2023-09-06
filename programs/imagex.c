@@ -224,6 +224,7 @@ enum {
 	IMAGEX_WIMBOOT_CONFIG_OPTION,
 	IMAGEX_WIMBOOT_OPTION,
 	IMAGEX_XML_OPTION,
+	IMAGEX_UNIX_NTFS_3G_XATTR_OPTION,
 };
 
 static const struct option apply_options[] = {
@@ -241,6 +242,7 @@ static const struct option apply_options[] = {
 	{T("wimboot"),     no_argument,       NULL, IMAGEX_WIMBOOT_OPTION},
 	{T("compact"),     required_argument, NULL, IMAGEX_COMPACT_OPTION},
 	{T("recover-data"), no_argument,      NULL, IMAGEX_RECOVER_DATA_OPTION},
+	{T("unix-with-xattr"), no_argument,   NULL, IMAGEX_UNIX_NTFS_3G_XATTR_OPTION},
 	{NULL, 0, NULL, 0},
 };
 
@@ -1606,6 +1608,9 @@ imagex_apply(int argc, tchar **argv, int cmd)
 			break;
 		case IMAGEX_RECOVER_DATA_OPTION:
 			extract_flags |= WIMLIB_EXTRACT_FLAG_RECOVER_DATA;
+			break;
+		case IMAGEX_UNIX_NTFS_3G_XATTR_OPTION:
+			extract_flags |= WIMLIB_EXTRACT_FLAG_UNIX_WITH_NTFS_3G_XATTR;
 			break;
 		default:
 			goto out_usage;

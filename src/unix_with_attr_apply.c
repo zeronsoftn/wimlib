@@ -124,6 +124,12 @@ struct unix_with_attr_apply_ctx {
 	/* Size allocated in @data_buffer  */
 	size_t data_buffer_size;
 
+	/* Current offset in the raw encrypted file being written  */
+	size_t encrypted_offset;
+
+	/* Current size of the raw encrypted file being written  */
+	size_t encrypted_size;	
+
 	/* Temporary buffer for reparse data  */
 	struct reparse_buffer_disk rpbuf;
 
@@ -505,7 +511,7 @@ unix_set_metadata(int fd, const struct wim_inode *inode,
 	//TODO: apply ntfs attributes with getxattr & setxattr
 
 	//* set ntfs file attribute with ntfs-3g attribute - compression attribute handled here?
-	ret = lsetxattr(path, "system.ntfs_attrib", inode->i_attributes, sizeof(le32), 0);
+	ret = lsetxattr(path, "system.ntfs_attrib", &inode->i_attributes, sizeof(inode->i_attributes), 0);
 	if (ret) {
 		WARNING_WITH_ERRNO("\"%s\": unable to set ntfs attributes", path);
 	}
@@ -516,7 +522,7 @@ unix_set_metadata(int fd, const struct wim_inode *inode,
 	if (ret) {
 		WARNING_WITH_ERRNO("\"%s\": unable to set ntfs timestamp", path);
 	}
-
+ 
 	//* set ntfs object id with ntfs-3g attribute
 	const void *object_id;
 	u32 len;
@@ -554,14 +560,9 @@ unix_set_metadata(int fd, const struct wim_inode *inode,
 
 		ret = lsetxattr(path, "system.ntfs_acl", desc, desc_size, 0);
 		if (ret) {
-			WARNING_WITH_ERRNO("Can't set security descriptor on \"%ls\"", path);
+			WARNING_WITH_ERRNO("Can't set security descriptor on \"%s\"", path);
 		}
 	}
-
-	//* set ntfs reparse data with ntfs-3g attribute
-	
-
-	//* set ntfs efs data with ntfs-3g attribute
 
 	return 0;
 }
@@ -615,7 +616,7 @@ unix_create_if_directory(const struct wim_dentry *dentry,
 		return WIMLIB_ERR_MKDIR;
 	}
 
-	//* Set DOS name of the created file with ntfs-3g extended attribute
+	//* Set DOS name of the created directory with ntfs-3g extended attribute
 	if (dentry->d_short_name)
 	{
 		int ret;
@@ -629,7 +630,7 @@ unix_create_if_directory(const struct wim_dentry *dentry,
 			ret = lsetxattr(path, "system.ntfs_dos_name", dos_name, dos_name_nbytes, 0);
 			if (unlikely(ret))
 			{
-				WARNING_WITH_ERRNO("Failed to set DOS name of \"%s\" in NTFS-3g mount point directory");
+				ERROR_WITH_ERRNO("Failed to set DOS name of \"%s\" in ntfs-3g mount point directory", path);
 			}
 		}
 		utf16le_put_tstr(dos_name);
@@ -721,7 +722,7 @@ unix_extract_if_empty_file(const struct wim_dentry *dentry,
 			ret = lsetxattr(path, "system.ntfs_dos_name", dos_name, dos_name_nbytes, 0);
 			if (unlikely(ret))
 			{
-				WARNING_WITH_ERRNO("Failed to set DOS name of \"%s\" in NTFS-3g mount point directory");
+				WARNING_WITH_ERRNO("Failed to set DOS name of \"%s\" in NTFS-3g mount point directory", path);
 			}
 		}
 		utf16le_put_tstr(dos_name);
@@ -781,13 +782,20 @@ unix_count_dentries(const struct list_head *dentry_list,
 /* As ntfs-3g automatically set reparse point as symlink or junction,
  * we don't have to create symlink manually. */
 static int
-unix_set_reparse_data(const struct wim_inode *inode, const char *path,
-		    size_t rpdatalen, struct unix_with_attr_apply_ctx *ctx)
+unix_set_reparse_data(const struct wim_dentry *dentry,
+	const struct reparse_buffer_disk *rpbuf,
+	u16 rpbuflen,
+	struct unix_with_attr_apply_ctx *ctx)
 {
-	char target[REPARSE_POINT_MAX_SIZE];
-	struct blob_descriptor blob_override;
 	int ret;
-	
+	const char *path;
+
+	path = unix_build_extraction_path(dentry, ctx);
+	ret = lsetxattr(path, "system.ntfs_reparse_data", rpbuf, rpbuflen, 0);
+	if (ret) {
+		ERROR_WITH_ERRNO("Failed to create reparse point for \"%s\"", path);
+	}
+
 	return ret;
 }
 
@@ -826,7 +834,7 @@ prepare_data_buffer(struct unix_with_attr_apply_ctx *ctx, u64 blob_size)
 
 static int
 unix_begin_extract_blob_instance(const struct blob_descriptor *blob,
-				 const struct wim_dentry *dentry,
+				 struct wim_dentry *dentry,
 				 const struct wim_inode_stream *strm,
 				 struct unix_with_attr_apply_ctx *ctx)
 {
@@ -885,6 +893,44 @@ retry_create:
 #endif
 	}
 	filedes_init(&ctx->open_fds[ctx->num_open_fds++], fd);
+	return 0;
+}
+
+/* Import the next block of raw encrypted data  */
+static void
+import_encrypted_data(char* pbData, void* pvCallbackContext, long *Length)
+{
+	struct unix_with_attr_apply_ctx *ctx = pvCallbackContext;
+	long copy_len;
+
+	copy_len = min(ctx->encrypted_size - ctx->encrypted_offset, *Length);
+	memcpy(pbData, &ctx->data_buffer[ctx->encrypted_offset], copy_len);
+	ctx->encrypted_offset += copy_len;
+	*Length = copy_len;
+}
+
+/*
+ * Write the raw encrypted data to the already-created file (or directory)
+ * corresponding to @dentry.
+ *
+ * The raw encrypted data is provided in ctx->data_buffer, and its size is
+ * ctx->encrypted_size.
+ *
+ * This function may close the target directory, in which case the caller needs
+ * to re-open it if needed.
+ */
+static int
+extract_encrypted_file(const struct wim_dentry *dentry,
+					struct unix_with_attr_apply_ctx *ctx)
+{
+	void *rawctx;
+	int ret;
+	const char *path;
+	// bool retried;
+
+	path = unix_build_extraction_path(dentry, ctx);
+
+
 	return 0;
 }
 
@@ -961,6 +1007,7 @@ unix_end_extract_blob(struct blob_descriptor *blob, int status, void *_ctx)
 {
 	struct unix_with_attr_apply_ctx *ctx = _ctx;
 	int ret;
+	const char *path;
 	const struct blob_extraction_target *targets = blob_extraction_targets(blob);
 	const struct wim_dentry *dentry;
 
@@ -1005,13 +1052,13 @@ unix_end_extract_blob(struct blob_descriptor *blob, int status, void *_ctx)
 		if (blob->size > REPARSE_DATA_MAX_SIZE) {
 			dentry = list_first_entry(&ctx->reparse_dentries,
 						  struct wim_dentry, d_tmp_list);
-			build_extraction_path(dentry, ctx);
-			ERROR("Reparse data of \"%ls\" has size "
+			path = unix_build_extraction_path(dentry, ctx);
+			ERROR("Reparse data of \"%s\" has size "
 			      "%"PRIu64" bytes (exceeds %u bytes)",
-			      current_path(ctx), blob->size,
+			      path, blob->size,
 			      REPARSE_DATA_MAX_SIZE);
 			ret = WIMLIB_ERR_INVALID_REPARSE_DATA;
-			return check_apply_error(dentry, ctx, ret);
+			return ret;
 		}
 
 		/* Reparse data  */
@@ -1022,13 +1069,25 @@ unix_end_extract_blob(struct blob_descriptor *blob, int status, void *_ctx)
 			complete_reparse_point(&ctx->rpbuf, dentry->d_inode,
 			        	    blob->size);
 
-			ret = 
-
+			ret = unix_set_reparse_data(dentry, &ctx->rpbuf,
+						REPARSE_DATA_OFFSET + blob->size,
+						ctx);
+			if (ret) {
+				return ret;
+			}
 		}
 	}
 
-	//TODO: create_hardlink after setting reparse data
+	/* -----------TODO------------ 
+		Extract efs files and directories.
+	*/
 
+	// if (!list_empty(&ctx->encrypted_dentries)) {
+	// 	ctx->encrypted_size = blob->size;
+	// 	list_for_each_entry(dentry, &ctx->encrypted_dentries, d_tmp_list) {
+			
+	// 	}
+	// }
 
 	return 0;
 }
@@ -1146,7 +1205,7 @@ out:
 	return ret;
 }
 
-const struct apply_operations unix_apply_ops = {
+const struct apply_operations unix_with_attr_apply_ops = {
 	.name			= "UNIX_WITH_ATTR",
 	.get_supported_features = unix_with_attr_get_supported_features,
 	.extract                = unix_with_attr_extract,
