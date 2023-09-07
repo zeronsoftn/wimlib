@@ -4372,7 +4372,7 @@ T(
 "                    [--check] [--ref=\"GLOB\"] [--no-acls] [--strict-acls]\n"
 "                    [--no-attributes] [--rpfix] [--norpfix]\n"
 "                    [--include-invalid-names] [--wimboot] [--unix-data]\n"
-"                    [--compact=FORMAT] [--recover-data]\n"
+"                    [--compact=FORMAT] [--recover-data] [--unix-with-xattr]\n"
 ),
 [CMD_CAPTURE] =
 T(

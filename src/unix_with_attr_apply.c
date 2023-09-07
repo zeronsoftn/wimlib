@@ -471,6 +471,31 @@ apply_unix_metadata(int fd, const struct wim_inode *inode,
 	return 0;
 }
 
+//* Set DOS name of the created file with ntfs-3g extended attribute
+static void
+unix_set_dos_name(const struct wim_dentry *dentry,
+		  const char *path)
+{
+	if (dentry->d_short_name)
+	{
+		int ret;
+		const char *dos_name;
+		size_t dos_name_nbytes;
+
+		ret = utf16le_get_tstr(dentry->d_short_name, dentry->d_short_name_nbytes, &dos_name, &dos_name_nbytes);
+
+		if (!ret)
+		{
+			ret = lsetxattr(path, "system.ntfs_dos_name", dos_name, dos_name_nbytes, 0);
+			if (unlikely(ret))
+			{
+				WARNING_WITH_ERRNO("Failed to set DOS name of \"%s\" in NTFS-3g mount point directory", path);
+			}
+		}
+		utf16le_put_tstr(dos_name);
+	}
+}
+
 /*
  * Set metadata on an extracted file.
  *
@@ -666,25 +691,7 @@ unix_create_if_directory(const struct wim_dentry *dentry,
 		return WIMLIB_ERR_MKDIR;
 	}
 
-	//* Set DOS name of the created directory with ntfs-3g extended attribute
-	if (dentry->d_short_name)
-	{
-		int ret;
-		const char *dos_name;
-		size_t dos_name_nbytes;
-
-		ret = utf16le_get_tstr(dentry->d_short_name, dentry->d_short_name_nbytes, &dos_name, &dos_name_nbytes);
-
-		if (!ret)
-		{
-			ret = lsetxattr(path, "system.ntfs_dos_name", dos_name, dos_name_nbytes, 0);
-			if (unlikely(ret))
-			{
-				ERROR_WITH_ERRNO("Failed to set DOS name of \"%s\" in ntfs-3g mount point directory", path);
-			}
-		}
-		utf16le_put_tstr(dos_name);
-	}
+	unix_set_dos_name(dentry, path);
 
 	return report_file_created(&ctx->common);
 }
@@ -758,25 +765,7 @@ unix_extract_if_empty_file(const struct wim_dentry *dentry,
 	if (ret)
 		return ret;
 
-	//* Set DOS name of the created file with ntfs-3g extended attribute
-	if (dentry->d_short_name)
-	{
-		int ret;
-		const char *dos_name;
-		size_t dos_name_nbytes;
-
-		ret = utf16le_get_tstr(dentry->d_short_name, dentry->d_short_name_nbytes, &dos_name, &dos_name_nbytes);
-
-		if (!ret)
-		{
-			ret = lsetxattr(path, "system.ntfs_dos_name", dos_name, dos_name_nbytes, 0);
-			if (unlikely(ret))
-			{
-				WARNING_WITH_ERRNO("Failed to set DOS name of \"%s\" in NTFS-3g mount point directory", path);
-			}
-		}
-		utf16le_put_tstr(dos_name);
-	}
+	unix_set_dos_name(dentry, path);
 
 	ret = unix_create_hardlinks(inode, dentry, path, ctx);
 	if (ret)
@@ -886,7 +875,6 @@ prepare_data_buffer(struct unix_with_attr_apply_ctx *ctx, u64 blob_size)
 	return true;
 }
 
-
 static int
 unix_begin_extract_blob_instance(const struct blob_descriptor *blob,
 				 struct wim_dentry *dentry,
@@ -895,7 +883,7 @@ unix_begin_extract_blob_instance(const struct blob_descriptor *blob,
 {
 	int fd;
 	int ret;
-	const char *first_path;
+	const char *path;
 
 	if (unlikely(strm->stream_type == STREAM_TYPE_REPARSE_POINT)) {
 		if (!prepare_data_buffer(ctx, blob->size))
@@ -929,13 +917,13 @@ unix_begin_extract_blob_instance(const struct blob_descriptor *blob,
 	/* This should be ensured by extract_blob_list()  */
 	wimlib_assert(ctx->num_open_fds < MAX_OPEN_FILES);
 
-	first_path = unix_build_extraction_path(dentry, ctx);
+	path = unix_build_extraction_path(dentry, ctx);
 retry_create:
-	fd = open(first_path, O_EXCL | O_CREAT | O_WRONLY | O_NOFOLLOW, 0644);
+	fd = open(path, O_EXCL | O_CREAT | O_WRONLY | O_NOFOLLOW, 0644);
 	if (fd < 0) {
-		if (errno == EEXIST && !unlink(first_path))
+		if (errno == EEXIST && !unlink(path))
 			goto retry_create;
-		ERROR_WITH_ERRNO("Can't create regular file \"%s\"", first_path);
+		ERROR_WITH_ERRNO("Can't create regular file \"%s\"", path);
 		return WIMLIB_ERR_OPEN;
 	}
 	if (dentry->d_inode->i_attributes & FILE_ATTRIBUTE_SPARSE_FILE) {
@@ -948,6 +936,10 @@ retry_create:
 #endif
 	}
 	filedes_init(&ctx->open_fds[ctx->num_open_fds++], fd);
+
+	/* Set DOS name of file if exists */
+	unix_set_dos_name(dentry, path);
+
 	return 0;
 }
 
