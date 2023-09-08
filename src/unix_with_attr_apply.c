@@ -158,6 +158,15 @@ struct unix_with_attr_apply_ctx {
 	unsigned long num_special_files_ignored;
 };
 
+/* FILE_FULL_EA_INFORMATION struct for extended attribute(EA) extraction. */
+typedef struct _NTFS_EA_INFO {
+	uint32_t EntrySize;
+	unsigned char Flags;
+	unsigned char EaNameLength;
+	unsigned short EaValueLength;
+	char EaName[1];
+} __attribute__((packed)) NTFS_EA_INFO;
+
 /* Returns the number of characters needed to represent the path to the
  * specified @dentry when extracted, not including the null terminator or the
  * path to the target directory itself.  */
@@ -471,6 +480,96 @@ apply_unix_metadata(int fd, const struct wim_inode *inode,
 	return 0;
 }
 
+/* Set ntfs extended attributes(EA) with ntfs-3g extended attribute */
+static int
+unix_set_ntfs_xattr(int fd, const struct wim_inode *inode,
+		  const char *path, 
+		  struct unix_with_attr_apply_ctx *ctx)
+{	
+	const void *entries, *entries_end;
+	u32 len;
+	const struct wim_xattr_entry *entry;
+	size_t bufsize = 0, rawsize;
+	u8 _buf[1024] __attribute__((aligned(4)));
+	u8 *buf = _buf;
+	u8 offset = 0;
+	NTFS_EA_INFO *ea, *ea_prev;
+	int ret;
+
+	entries = inode_get_xattrs(inode, &len);
+
+	if (likely(entries == NULL || len == 0)) /* No extended attributes? */
+		return 0;
+	entries_end = entries + len;
+
+	entry = entries;
+	for (entry = entries; (void *)entry < entries_end;
+	     entry = xattr_entry_next(entry)) {
+		if (!valid_xattr_entry(entry, entries_end - (void *)entry)) {
+			ERROR("\"%"TS"\": extended attribute is corrupt or unsupported",
+			      inode_any_full_path(inode));
+			return WIMLIB_ERR_INVALID_XATTR;
+		}
+
+		bufsize += ALIGN(offsetof(NTFS_EA_INFO, EaName) +
+			 entry->name_len + 1 +
+			 le16_to_cpu(entry->value_len), 4);
+	}
+
+	if (unlikely(bufsize != (u32)bufsize)) {
+		ERROR("\"%"TS"\": too many extended attributes to extract!",
+		      inode_any_full_path(inode));
+		return WIMLIB_ERR_INVALID_XATTR;
+	}
+
+	if (unlikely(bufsize > sizeof(_buf))) {
+		buf = MALLOC(bufsize + 4); // *Allocate more space for aligning if required.
+		if (!buf)
+			return WIMLIB_ERR_NOMEM;
+	}
+
+	ea_prev = NULL;
+	offset = ((uintptr_t)buf & 3) != 0 ? 4 - ((uintptr_t)buf & 3) : 0;
+	ea = (NTFS_EA_INFO *)(buf + offset);
+	for (entry = entries; (void *)entry < entries_end;
+		 entry = xattr_entry_next(entry)) {
+		u8 *p;
+
+		if (ea_prev)
+			ea_prev->EntrySize = (u8 *)ea - (u8 *)ea_prev;
+
+		if (xattr_entry_next(entry) == entries_end)
+		{
+			rawsize = sizeof(NTFS_EA_INFO) + entry->name_len + 
+			entry->value_len;
+			while (rawsize & 3)
+				rawsize++;
+			ea->EntrySize = rawsize;
+		}
+
+		ea->Flags = entry->flags;
+		ea->EaNameLength = entry->name_len;
+		ea->EaValueLength = le16_to_cpu(entry->value_len);
+		p = mempcpy(ea->EaName, entry->name,
+				ea->EaNameLength + 1 + ea->EaValueLength);
+		while ((uintptr_t)p & 3)
+			*p++ = 0;
+		ea_prev = ea;
+		ea = (NTFS_EA_INFO *)p;
+	}
+	wimlib_assert((u8 *)ea - buf == bufsize);
+
+	ret = fd > 0 ? 
+		fsetxattr(fd,"system.ntfs_ea", buf, bufsize, 0) : 
+		lsetxattr(path, "system.ntfs_ea", buf, bufsize, 0);
+
+out:
+	if (buf != _buf)
+		FREE(buf);
+
+	return ret;
+}
+
 //* Set DOS name of the created file with ntfs-3g extended attribute
 static void
 unix_set_dos_name(const struct wim_dentry *dentry,
@@ -545,6 +644,8 @@ unix_set_metadata(int fd, const struct wim_inode *inode,
 	ret = fd > 0 ? fsetxattr(fd, "system.ntfs_times", buf, sizeof(buf), 0) : 
 	lsetxattr(path, "system.ntfs_times", buf, sizeof(buf), 0);
 	if (ret) {
+		if (!path)
+			path = unix_build_inode_extraction_path(inode, ctx);
 		WARNING_WITH_ERRNO("\"%s\": unable to set ntfs timestamp", path);
 	}
 
@@ -557,20 +658,20 @@ unix_set_metadata(int fd, const struct wim_inode *inode,
 		ret = fd > 0 ? fsetxattr(fd, "system.ntfs_object_id", object_id, len, 0) : 
 		lsetxattr(path, "system.ntfs_object_id", object_id, len, 0);
 		if (ret) {
+			if (!path)
+				path = unix_build_inode_extraction_path(inode, ctx);
 			WARNING_WITH_ERRNO("\"%s\": unable to set ntfs object id", path);
 		}
 	}
 
-	//* set ntfs extended attributes(EA) with ntfs-3g attribute
-	const void *entries;
-
-	entries = inode_get_xattrs(inode, &len);
-	if (unlikely(entries != NULL && len != 0)) {
-		ret = fd > 0 ? fsetxattr(fd, "system.ntfs_ea", entries, len, 0) : 
-		lsetxattr(path, "system.ntfs_ea", object_id, len, 0);
-		if (ret) {
-			WARNING_WITH_ERRNO("\"%s\": unable to set ntfs extended attribute(EA)", path);
-		}
+	//****
+	//TODO: set EA
+	//****
+	ret = unix_set_ntfs_xattr(fd, inode, path, ctx);
+	if (ret) {
+		if (!path)
+			path = unix_build_inode_extraction_path(inode, ctx);
+		WARNING_WITH_ERRNO("\"%s\": unable to set ntfs extended attribute(EA)", path);
 	}
 	
 	//* set ntfs security descriptor with ntfs-3g attribute
@@ -588,6 +689,8 @@ unix_set_metadata(int fd, const struct wim_inode *inode,
 		ret = fd > 0 ? fsetxattr(fd, "system.ntfs_acl", desc, desc_size, 0) : 
 		lsetxattr(path, "system.ntfs_acl", desc, desc_size, 0);
 		if (ret) {
+			if (!path)
+				path = unix_build_inode_extraction_path(inode, ctx);
 			WARNING_WITH_ERRNO("Can't set security descriptor on \"%s\"", path);
 		}
 	}
