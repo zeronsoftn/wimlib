@@ -535,18 +535,12 @@ unix_set_ntfs_xattr(int fd, const struct wim_inode *inode,
 		 entry = xattr_entry_next(entry)) {
 		u8 *p;
 
-		if (ea_prev)
-			ea_prev->EntrySize = (u8 *)ea - (u8 *)ea_prev;
-
-		if (xattr_entry_next(entry) == entries_end)
-		{
-			rawsize = sizeof(NTFS_EA_INFO) + entry->name_len + 
-			entry->value_len;
-			while (rawsize & 3)
-				rawsize++;
-			ea->EntrySize = rawsize;
-		}
-
+		rawsize = sizeof(NTFS_EA_INFO) + entry->name_len + 
+		entry->value_len;
+		while (rawsize & 3)
+			rawsize++;
+		
+		ea->EntrySize = rawsize;
 		ea->Flags = entry->flags;
 		ea->EaNameLength = entry->name_len;
 		ea->EaValueLength = le16_to_cpu(entry->value_len);
