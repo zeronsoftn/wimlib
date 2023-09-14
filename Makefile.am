@@ -152,6 +152,8 @@ libwim_la_SOURCES =		\
 	include/wimlib/types.h		\
 	include/wimlib/unaligned.h	\
 	include/wimlib/unix_data.h	\
+	include/wimlib/unix_ntfs_3g.h \
+	include/wimlib/unix_ntfs_3g_xattr.h \
 	include/wimlib/util.h		\
 	include/wimlib/wim.h		\
 	include/wimlib/write.h		\

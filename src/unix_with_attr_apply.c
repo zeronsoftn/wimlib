@@ -50,6 +50,8 @@
 #include "wimlib/scan.h"
 #include "wimlib/timestamp.h"
 #include "wimlib/unix_data.h"
+#include "wimlib/unix_ntfs_3g.h"
+#include "wimlib/unix_ntfs_3g_xattr.h"
 #include "wimlib/xattr.h"
 
 /* We don't require O_NOFOLLOW, but the advantage of having it is that if we
@@ -128,7 +130,7 @@ struct unix_with_attr_apply_ctx {
 	size_t encrypted_offset;
 
 	/* Current size of the raw encrypted file being written  */
-	size_t encrypted_size;	
+	size_t encrypted_size;
 
 	/* Temporary buffer for reparse data  */
 	struct reparse_buffer_disk rpbuf;
@@ -141,11 +143,6 @@ struct unix_with_attr_apply_ctx {
 	 * data extracted as soon as the whole blob has been read into
 	 * @data_buffer.  */
 	struct list_head reparse_dentries;
-
-	/* List of dentries, joined by @d_tmp_list, that need to have raw
-	 * encrypted data extracted as soon as the whole blob has been read into
-	 * @data_buffer.  */
-	struct list_head encrypted_dentries;
 
 	/* Absolute path to the target directory (allocated buffer).  Only set
 	 * if needed for absolute symbolic link fixups.  */
@@ -658,9 +655,6 @@ unix_set_metadata(int fd, const struct wim_inode *inode,
 		}
 	}
 
-	//****
-	//TODO: set EA
-	//****
 	ret = unix_set_ntfs_xattr(fd, inode, path, ctx);
 	if (ret) {
 		if (!path)
@@ -721,7 +715,7 @@ unix_create_hardlinks(const struct wim_inode *inode,
 }
 
 /* Prepare file or directory to be used for reparse point
-	as ntfs-3g needs a file entry to inject extended attribute. */
+	as ntfs-3g needs a file entry to set extended attribute. */
 static int
 unix_prepare_reparse_points(const struct wim_dentry *dentry,
 			 struct unix_with_attr_apply_ctx *ctx)
@@ -989,27 +983,9 @@ unix_begin_extract_blob_instance(const struct blob_descriptor *blob,
 		return 0;
 	}
 
-	if (unlikely(strm->stream_type == STREAM_TYPE_EFSRPC_RAW_DATA)) {
-		/* We can't write encrypted files directly; we must use
-		 * WriteEncryptedFileRaw(), which requires providing the data
-		 * through a callback function.  This can't easily be combined
-		 * with our own callback-based approach.
-		 *
-		 * The current workaround is to simply read the blob into memory
-		 * and write the encrypted file from that.
-		 *
-		 * TODO: This isn't sufficient for extremely large encrypted
-		 * files.  Perhaps we should create an extra thread to write
-		 * such files...  */
-		if (!prepare_data_buffer(ctx, blob->size))
-			return WIMLIB_ERR_NOMEM;
-		list_add_tail(&dentry->d_tmp_list, &ctx->encrypted_dentries);
-		return 0;
-	}
+	wimlib_assert(stream_is_unnamed_data_stream(strm) || strm->stream_type == STREAM_TYPE_EFSRPC_RAW_DATA);
 
-	wimlib_assert(stream_is_unnamed_data_stream(strm));
-
-	/* Unnamed data stream of "regular" file  */
+	/* Unnamed data stream of "regular" file and "encrypted" file  */
 
 	/* This should be ensured by extract_blob_list()  */
 	wimlib_assert(ctx->num_open_fds < MAX_OPEN_FILES);
@@ -1040,44 +1016,6 @@ retry_create:
 	return 0;
 }
 
-/* Import the next block of raw encrypted data  */
-static void
-import_encrypted_data(char* pbData, void* pvCallbackContext, long *Length)
-{
-	struct unix_with_attr_apply_ctx *ctx = pvCallbackContext;
-	long copy_len;
-
-	copy_len = min(ctx->encrypted_size - ctx->encrypted_offset, *Length);
-	memcpy(pbData, &ctx->data_buffer[ctx->encrypted_offset], copy_len);
-	ctx->encrypted_offset += copy_len;
-	*Length = copy_len;
-}
-
-/*
- * Write the raw encrypted data to the already-created file (or directory)
- * corresponding to @dentry.
- *
- * The raw encrypted data is provided in ctx->data_buffer, and its size is
- * ctx->encrypted_size.
- *
- * This function may close the target directory, in which case the caller needs
- * to re-open it if needed.
- */
-static int
-extract_encrypted_file(const struct wim_dentry *dentry,
-					struct unix_with_attr_apply_ctx *ctx)
-{
-	void *rawctx;
-	int ret;
-	const char *path;
-	// bool retried;
-
-	path = unix_build_extraction_path(dentry, ctx);
-
-	// *TODO
-	return 0;
-}
-
 /* Called when starting to read a blob for extraction  */
 static int
 unix_begin_extract_blob(struct blob_descriptor *blob, void *_ctx)
@@ -1089,8 +1027,9 @@ unix_begin_extract_blob(struct blob_descriptor *blob, void *_ctx)
 	ctx->num_open_fds = 0;
 	ctx->data_buffer_ptr = NULL;
 	ctx->any_sparse_files = false;
+	ctx->encrypted_offset = 0;
+	ctx->encrypted_size = 0;
 	INIT_LIST_HEAD(&ctx->reparse_dentries);
-	INIT_LIST_HEAD(&ctx->encrypted_dentries);
 
 	for (u32 i = 0; i < blob->out_refcnt; i++) {
 		const struct wim_inode *inode = targets[i].inode;
@@ -1112,12 +1051,24 @@ unix_extract_chunk(const struct blob_descriptor *blob, u64 offset,
 		   const void *chunk, size_t size, void *_ctx)
 {
 	struct unix_with_attr_apply_ctx *ctx = _ctx;
-	const void * const end = chunk + size;
+	const void *end = chunk + size;
 	const void *p;
 	bool zeroes;
 	size_t len;
 	unsigned i;
 	int ret;
+
+	/* 
+	 * This is where we handle encrypted files,
+	 * after the data is uncompressed so it
+	 * can be read correctly. 
+	 * As encrypted data buffer is devided into
+	 * 64KB of encrypted data, we need to parse
+	 * metadatas between them.
+	 */
+
+	/* Is the chunk from blob with encrypted file? */
+	const struct blob_extraction_target *targets = blob_extraction_targets(blob);
 
 	/*
 	 * For sparse files, only write nonzero regions.  This lets the
@@ -1226,13 +1177,6 @@ unix_end_extract_blob(struct blob_descriptor *blob, int status, void *_ctx)
 		Extract efs files and directories.
 	*/
 
-	// if (!list_empty(&ctx->encrypted_dentries)) {
-	// 	ctx->encrypted_size = blob->size;
-	// 	list_for_each_entry(dentry, &ctx->encrypted_dentries, d_tmp_list) {
-			
-	// 	}
-	// }
-
 	return 0;
 }
 
@@ -1311,7 +1255,7 @@ unix_with_attr_extract(struct list_head *dentry_list, struct apply_ctx *_ctx)
 		ctx->target_abspath_nchars = strlen(ctx->target_abspath);
 	}
 
-	/* Extract nonempty regular files and symbolic links.  */
+	/* Extract nonempty regular or encrypted files and symbolic links.  */
 
 	struct read_blob_callbacks cbs = {
 		.begin_blob	= unix_begin_extract_blob,
@@ -1322,7 +1266,6 @@ unix_with_attr_extract(struct list_head *dentry_list, struct apply_ctx *_ctx)
 	ret = extract_blob_list(&ctx->common, &cbs);
 	if (ret)
 		goto out;
-
 
 	/* Set directory metadata.  We do this last so that we get the right
 	 * directory timestamps.  */
