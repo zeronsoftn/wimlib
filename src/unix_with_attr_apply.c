@@ -49,8 +49,8 @@
 #include "wimlib/reparse.h"
 #include "wimlib/scan.h"
 #include "wimlib/timestamp.h"
+#include "wimlib/unix_efs.h"
 #include "wimlib/unix_data.h"
-#include "wimlib/unix_ntfs_3g.h"
 #include "wimlib/unix_ntfs_3g_xattr.h"
 #include "wimlib/xattr.h"
 
@@ -116,6 +116,9 @@ struct unix_with_attr_apply_ctx {
 	/* Whether is_sparse_file[] is true for any currently open file  */
 	bool any_sparse_files;
 
+	/* For each currently open file, whether the file is EFSRPC raw data format */
+	bool is_efsraw_file[MAX_OPEN_FILES];
+
 	/* Allocated buffer for reading blob data when it cannot be extracted
 	 * directly  */
 	u8 *data_buffer;
@@ -126,11 +129,8 @@ struct unix_with_attr_apply_ctx {
 	/* Size allocated in @data_buffer  */
 	size_t data_buffer_size;
 
-	/* Current offset in the raw encrypted file being written  */
-	size_t encrypted_offset;
-
-	/* Current size of the raw encrypted file being written  */
-	size_t encrypted_size;
+	/* Context for encrypted file that is being written  */
+	efs_context efs_cxt;
 
 	/* Temporary buffer for reparse data  */
 	struct reparse_buffer_disk rpbuf;
@@ -154,15 +154,6 @@ struct unix_with_attr_apply_ctx {
 	/* Number of special files we couldn't create due to EPERM  */
 	unsigned long num_special_files_ignored;
 };
-
-/* FILE_FULL_EA_INFORMATION struct for extended attribute(EA) extraction. */
-typedef struct _NTFS_EA_INFO {
-	uint32_t EntrySize;
-	unsigned char Flags;
-	unsigned char EaNameLength;
-	unsigned short EaValueLength;
-	char EaName[1];
-} __attribute__((packed)) NTFS_EA_INFO;
 
 /* Returns the number of characters needed to represent the path to the
  * specified @dentry when extracted, not including the null terminator or the
@@ -983,7 +974,18 @@ unix_begin_extract_blob_instance(const struct blob_descriptor *blob,
 		return 0;
 	}
 
-	wimlib_assert(stream_is_unnamed_data_stream(strm) || strm->stream_type == STREAM_TYPE_EFSRPC_RAW_DATA);
+	if (unlikely(strm->stream_type == STREAM_TYPE_EFSRPC_RAW_DATA)) {
+		ctx->is_efsraw_file[ctx->num_open_fds] = true;
+		ctx->efs_cxt = (efs_context) {
+			.parse_state = 0,
+			.buffer = NULL,
+			.efs_header = NULL,
+			.current_stream_name = NULL,
+			.current_stream_data = NULL
+		};
+	}
+
+	wimlib_assert(stream_is_unnamed_data_or_encrypted_stream(strm));
 
 	/* Unnamed data stream of "regular" file and "encrypted" file  */
 
@@ -1027,8 +1029,6 @@ unix_begin_extract_blob(struct blob_descriptor *blob, void *_ctx)
 	ctx->num_open_fds = 0;
 	ctx->data_buffer_ptr = NULL;
 	ctx->any_sparse_files = false;
-	ctx->encrypted_offset = 0;
-	ctx->encrypted_size = 0;
 	INIT_LIST_HEAD(&ctx->reparse_dentries);
 
 	for (u32 i = 0; i < blob->out_refcnt; i++) {
@@ -1058,6 +1058,8 @@ unix_extract_chunk(const struct blob_descriptor *blob, u64 offset,
 	unsigned i;
 	int ret;
 
+	size_t efs_len = 0; //* The size of a written bytes of raw encrypted data.
+
 	/* 
 	 * This is where we handle encrypted files,
 	 * after the data is uncompressed so it
@@ -1067,17 +1069,23 @@ unix_extract_chunk(const struct blob_descriptor *blob, u64 offset,
 	 * metadatas between them.
 	 */
 
-	/* Is the chunk from blob with encrypted file? */
-	const struct blob_extraction_target *targets = blob_extraction_targets(blob);
-
 	/*
 	 * For sparse files, only write nonzero regions.  This lets the
-	 * filesystem use holes to represent zero regions.
+	 * filesystem use holes to represent zero regions. And for encrypted
+	 * files parse EFSRPC data to acquire and write encrypted data. 
 	 */
 	for (p = chunk; p != end; p += len, offset += len) {
 		zeroes = maybe_detect_sparse_region(p, end - p, &len,
 						    ctx->any_sparse_files);
 		for (i = 0; i < ctx->num_open_fds; i++) {
+			if (ctx->is_efsraw_file[i]) {
+				efs_len = len;
+				// ret =full_pwrite(&ctx->open_fds[i],
+				// 	p, efs_len, ctx->efs_offset);
+		// 각각 암호화 파일에 대한 오프셋 저장
+				goto write_end;
+			}
+			
 			if (!zeroes || !ctx->is_sparse_file[i]) {
 				ret = full_pwrite(&ctx->open_fds[i],
 						  p, len, offset);
@@ -1087,6 +1095,7 @@ unix_extract_chunk(const struct blob_descriptor *blob, u64 offset,
 		}
 	}
 
+write_end:
 	if (ctx->data_buffer_ptr)
 		ctx->data_buffer_ptr = mempcpy(ctx->data_buffer_ptr, chunk, size);
 	return 0;
