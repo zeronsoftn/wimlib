@@ -389,6 +389,11 @@ stream_is_unnamed_data_stream(const struct wim_inode_stream *strm)
 }
 
 static inline bool
+stream_is_unnamed_data_or_encrypted_stream(const struct wim_inode_stream *strm) {
+	return (strm->stream_type == STREAM_TYPE_DATA || strm->stream_type == STREAM_TYPE_EFSRPC_RAW_DATA) && !stream_is_named(strm);
+}
+
+static inline bool
 stream_is_named_data_stream(const struct wim_inode_stream *strm)
 {
 	return strm->stream_type == STREAM_TYPE_DATA && stream_is_named(strm);

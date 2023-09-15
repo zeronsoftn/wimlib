@@ -42,7 +42,7 @@
 #include "wimlib/sha1.h"
 #include "wimlib/wim.h"
 #include "wimlib/win32.h"
-#include "wimlib/unix_ntfs_3g.h"
+#include "wimlib/unix_efs.h"
 
 /*
  *                         Compressed WIM resources
@@ -406,12 +406,6 @@ read_compressed_wim_resource(const struct wim_resource_descriptor * const rdesc,
 	const struct data_range * const end_range = &ranges[num_ranges];
 	u64 cur_range_pos = cur_range->offset;
 	u64 cur_range_end = cur_range->offset + cur_range->size;
-
-	//TODO: Set offset and size for encrypted data for parsing
-	const struct blob_extraction_target *targets = blob_extraction_targets(rdesc->blob_list.next);
-	if (targets->inode.i_attributes & FILE_ATTRIBUTE_ENCRYPTED) {
-		
-	}
 
 	/* Read and process each needed chunk.  */
 	for (u64 i = read_start_chunk; i <= last_needed_chunk; i++) {
