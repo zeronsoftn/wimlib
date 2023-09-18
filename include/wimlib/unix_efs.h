@@ -6,6 +6,7 @@
 #include "wimlib/encoding.h"
 #include "wimlib/types.h"
 #include "wimlib/util.h"
+#include <sys/xattr.h>
 
 #define SIGNATURE_STREAM_NAME (utf16lechar[]){ 'N', 'T', 'F', 'S', '\0' }
 #define SIGNATURE_STREAM_DATA (utf16lechar[]){ 'G', 'U', 'R', 'E', '\0' }
@@ -43,8 +44,10 @@ typedef struct _EFS_STREAM_NAME_HEADER {
 typedef struct _EFS_STREAM_DATA_HEADER {
 	u32 size; //* max 66048 bytes for efs data
 	utf16lechar signature[4]; //*signature "GURE"
-	u32 unknown_0x0c[4];
+	u32 unknown_0x0c;
 } __attribute__((packed)) EFS_STREAM_DATA_HEADER;
+
+
 
 /* Can have more than one if file is bigger than 64KB */
 typedef struct _DATA_ENTRY_HEADER {
@@ -100,7 +103,9 @@ typedef struct _EFS_DATA {
 	} STREAM_DATA;
 } __attribute__((packed)) EFS_DATA;
 
-enum {
+enum PARSE_STATE {
+	NULL_STATE = -1,
+
     ROOT_HEADER_STATE,
     STRM_HEADER_STATE,
     STRM_NAME_STATE,
@@ -112,7 +117,7 @@ typedef int PARSE_STATE;
 
 typedef struct _EFS_STREAM_NAME {
 	EFS_STREAM_NAME_HEADER header;
-	u8 data[];
+	void *data;
 } EFS_STREAM_NAME;
 
 typedef struct _EFS_STREAM_DATA {
@@ -121,7 +126,6 @@ typedef struct _EFS_STREAM_DATA {
 	u32 position;
 
 	void *buffer;
-	int fd;
 } EFS_STREAM_DATA;
 
 typedef struct _efs_buffer {
@@ -138,9 +142,28 @@ typedef struct _efs_context {
 
 	EFS_STREAM_NAME current_stream_name;
 	EFS_STREAM_DATA current_stream_data;
+
+	bool is_efs_info;
+	int fd;
 } efs_context;
 
-bool check_signature(utf16lechar *, utf16lechar *);
+bool
+check_signature(utf16lechar *a, utf16lechar *b);
 
-int efs_parse_chunk(const void *, size_t *, efs_context *);
+inline void *
+efs_current(efs_buffer* buf);
 
+inline size_t
+efs_readable_size(efs_buffer *buf);
+
+void
+efs_append(efs_buffer *buf, void *p, size_t len);
+
+inline void
+efs_proceed(efs_buffer *buf, size_t length);
+
+void
+efs_cleanup(efs_buffer *buf);
+
+bool
+efs_parse_chunk(const void *p, size_t *len, efs_context *cxt);
