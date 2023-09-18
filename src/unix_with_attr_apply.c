@@ -119,6 +119,9 @@ struct unix_with_attr_apply_ctx {
 	/* For each currently open file, whether the file is EFSRPC raw data format */
 	bool is_efsraw_file[MAX_OPEN_FILES];
 
+	/* Offset of currently open encrypted file */
+	u64 efs_file_offset[MAX_OPEN_FILES];
+
 	/* Allocated buffer for reading blob data when it cannot be extracted
 	 * directly  */
 	u8 *data_buffer;
@@ -541,8 +544,7 @@ unix_set_ntfs_xattr(int fd, const struct wim_inode *inode,
 	}
 	wimlib_assert((u8 *)ea - buf == bufsize);
 
-	ret = fd > 0 ? 
-		fsetxattr(fd,"system.ntfs_ea", buf, bufsize, 0) : 
+	ret = fd > 0 ? fsetxattr(fd,"system.ntfs_ea", buf, bufsize, 0) : 
 		lsetxattr(path, "system.ntfs_ea", buf, bufsize, 0);
 
 out:
@@ -976,12 +978,30 @@ unix_begin_extract_blob_instance(const struct blob_descriptor *blob,
 
 	if (unlikely(strm->stream_type == STREAM_TYPE_EFSRPC_RAW_DATA)) {
 		ctx->is_efsraw_file[ctx->num_open_fds] = true;
+		ctx->efs_file_offset[ctx->num_open_fds] = 0;
 		ctx->efs_cxt = (efs_context) {
-			.parse_state = 0,
+			.parse_state = ROOT_HEADER_STATE,
 			.buffer = NULL,
 			.efs_header = NULL,
-			.current_stream_name = NULL,
-			.current_stream_data = NULL
+			.current_stream_name = (EFS_STREAM_NAME) {
+				.header = (EFS_STREAM_NAME_HEADER) {
+					.size = 0,
+					.name_size = 0,
+					.signature = NULL
+				},
+				.data = NULL
+			},
+			.current_stream_data = (EFS_STREAM_DATA) {
+				.header = (EFS_STREAM_DATA_HEADER) {
+					.size = 0,
+					.signature = NULL
+				},
+				.datasize = 0,
+				.position = 0,
+				.buffer = NULL,
+				.fd = 0
+			},
+			.is_efs_info = false
 		};
 	}
 
@@ -1029,6 +1049,13 @@ unix_begin_extract_blob(struct blob_descriptor *blob, void *_ctx)
 	ctx->num_open_fds = 0;
 	ctx->data_buffer_ptr = NULL;
 	ctx->any_sparse_files = false;
+	ctx->efs_cxt = (efs_context) {
+		.parse_state = NULL_STATE,
+		.buffer = NULL,
+		.efs_header = NULL,
+		.current_stream_name = NULL,
+		.current_stream_data = NULL
+	};
 	INIT_LIST_HEAD(&ctx->reparse_dentries);
 
 	for (u32 i = 0; i < blob->out_refcnt; i++) {
@@ -1057,6 +1084,8 @@ unix_extract_chunk(const struct blob_descriptor *blob, u64 offset,
 	size_t len;
 	unsigned i;
 	int ret;
+	void *efs_p;
+	bool parse_ret;
 
 	size_t efs_len = 0; //* The size of a written bytes of raw encrypted data.
 
@@ -1071,18 +1100,25 @@ unix_extract_chunk(const struct blob_descriptor *blob, u64 offset,
 
 	/*
 	 * For sparse files, only write nonzero regions.  This lets the
-	 * filesystem use holes to represent zero regions. And for encrypted
-	 * files parse EFSRPC data to acquire and write encrypted data. 
+	 * filesystem use holes to represent zero regions. 
 	 */
 	for (p = chunk; p != end; p += len, offset += len) {
 		zeroes = maybe_detect_sparse_region(p, end - p, &len,
 						    ctx->any_sparse_files);
+
+		/*
+		 * Parse EFSRPC data to acquire and write encrypted data.
+		 */
 		for (i = 0; i < ctx->num_open_fds; i++) {
 			if (ctx->is_efsraw_file[i]) {
 				efs_len = len;
-				// ret =full_pwrite(&ctx->open_fds[i],
-				// 	p, efs_len, ctx->efs_offset);
-		// 각각 암호화 파일에 대한 오프셋 저장
+				parse_ret = efs_parse_chunk(efs_p, &efs_len, &ctx->efs_cxt);
+				if (!parse_ret) {
+					goto err;
+				}
+				ret =full_pwrite(&ctx->open_fds[i],
+					efs_p, efs_len,
+					ctx->efs_file_offset[i]);
 				goto write_end;
 			}
 			
@@ -1096,6 +1132,10 @@ unix_extract_chunk(const struct blob_descriptor *blob, u64 offset,
 	}
 
 write_end:
+	if (efs_p) {
+		FREE(efs_p);
+	}
+
 	if (ctx->data_buffer_ptr)
 		ctx->data_buffer_ptr = mempcpy(ctx->data_buffer_ptr, chunk, size);
 	return 0;

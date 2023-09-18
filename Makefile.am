@@ -152,7 +152,6 @@ libwim_la_SOURCES =		\
 	include/wimlib/types.h		\
 	include/wimlib/unaligned.h	\
 	include/wimlib/unix_data.h	\
-	include/wimlib/unix_efs.h 	\
 	include/wimlib/unix_ntfs_3g_xattr.h \
 	include/wimlib/util.h		\
 	include/wimlib/wim.h		\
@@ -185,8 +184,10 @@ PLATFORM_LIBS = -lntdll
 else
 libwim_la_SOURCES += src/unix_apply.c		\
 			 src/unix_with_attr_apply.c		\
-		     src/unix_capture.c			\
-			 src/unix_efs.c
+		     src/unix_capture.c				\
+			 src/unix_efs.c 			\
+			 include/wimlib/unix_efs.h
+
 PLATFORM_LIBS =
 endif
 
