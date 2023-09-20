@@ -1,6 +1,6 @@
 #include "wimlib/unix_efs.h"
 
-bool
+static bool
 check_signature(utf16lechar *a, utf16lechar *b) {
     size_t l1, l2;
     l1 = utf16le_len_chars(a);
@@ -13,86 +13,75 @@ check_signature(utf16lechar *a, utf16lechar *b) {
     return cmp_utf16le_strings(a, l1, b, l2, false);
 }
 
-inline void *
-efs_current(efs_buffer* buf) {
+static inline void *
+efs_current(efs_buffer *buf) {
     return (void *)(buf->buffer + buf->position);
 }
 
-inline size_t
+static inline size_t
 efs_readable_size(efs_buffer *buf) {
     return buf->length - buf->position;
 }
 
-void
+static void
 efs_append(efs_buffer *buf, void *p, size_t len) {
     efs_cleanup(buf);
     buf->buffer = REALLOC(buf->buffer, buf->length + len);
+    memcpy(buf->buffer + buf->length, p, len);
     buf->length += len;
 }
 
-inline void
+static inline void
 efs_proceed(efs_buffer *buf, size_t len) {
     buf->position += len;
 }
 
-void
+static void
 efs_cleanup(efs_buffer *buf) {
     size_t remain = buf->length - buf->position;
-    buf->position = 0;
-    buf->length = remain;
 
     if (!buf->buffer) {
         return;
     }
 
-    void *new_p = NULL;
-    
     if (remain) {
-        new_p = MALLOC(remain);
+        void *new_p = MALLOC(remain);
         memcpy(new_p, buf->buffer + buf->position, remain);
-    }
-
-    FREE(buf->buffer);
-    
-    if (new_p) {
+        FREE(buf->buffer);
         buf->buffer = new_p;
     }
+
+    buf->position = 0;
+    buf->length = remain;
 }
 
-bool
-efs_parse_chunk(const void *p, size_t *len, efs_context *cxt) {
-    cxt->buffer.buffer = MALLOC(*len);
-    memcpy(cxt->buffer.buffer, p, *len);
 
-    return 0;
-}
-
-bool read_root_header(efs_context *cxt) {
-    if (efs_readable_size(cxt->buffer.buffer) < sizeof(EFS_HEADER)) {
+static bool
+read_root_header(efs_context *ctx) {
+    if (efs_readable_size(ctx->buffer.buffer) < sizeof(EFS_HEADER)) {
         return false;
     }
 
-    EFS_HEADER *temp;
-    temp = (EFS_HEADER *)efs_current(cxt->buffer.buffer);
+    EFS_HEADER *temp = (EFS_HEADER *)efs_current(ctx->buffer.buffer);
 
     utf16lechar* signature = temp->signature;
     
     if (!check_signature(signature, (utf16lechar[5]){ 'R', 'O', 'B', 'S', '\0' })) {
+		ctx->err_flag = true;
         return false;
     }
-    efs_proceed(cxt->buffer.buffer, sizeof(EFS_HEADER));
+    efs_proceed(ctx->buffer.buffer, sizeof(EFS_HEADER));
 
     return true;
 }
 
-PARSE_STATE read_stream_header(efs_context *cxt) {
-    EFS_STREAM_HEADER *header;
-
-    if (efs_readable_size(cxt->buffer.buffer) < sizeof(EFS_STREAM_HEADER)) {
+static PARSE_STATE
+read_stream_header(efs_context *ctx) {
+    if (efs_readable_size(ctx->buffer.buffer) < sizeof(EFS_STREAM_HEADER)) {
         return NULL_STATE;
     }
 
-    header = (EFS_STREAM_HEADER *)efs_current(cxt->buffer.buffer);
+    EFS_STREAM_HEADER *header = (EFS_STREAM_HEADER *)efs_current(ctx->buffer.buffer);
 
     if (check_signature(header->signature, SIGNATURE_STREAM_NAME)) {
         return STRM_NAME_STATE;
@@ -105,77 +94,186 @@ PARSE_STATE read_stream_header(efs_context *cxt) {
     }
 }
 
-bool read_stream_name(efs_context *cxt) {
-    if (efs_readable_size(cxt->buffer.buffer) < sizeof(EFS_STREAM_NAME_HEADER)) {
+static bool
+read_stream_name(efs_context *ctx) {
+    if (efs_readable_size(ctx->buffer.buffer) < sizeof(EFS_STREAM_NAME_HEADER)) {
         return false;
     }
 
-    cxt->current_stream_name.header = *(EFS_STREAM_NAME_HEADER *)efs_current(cxt->buffer.buffer);
+    ctx->current_stream_name.header = *(EFS_STREAM_NAME_HEADER *)efs_current(ctx->buffer.buffer);
 
-    if (!check_signature(cxt->current_stream_name.header.signature, SIGNATURE_STREAM_NAME)) {
+    if (!check_signature(ctx->current_stream_name.header.signature, SIGNATURE_STREAM_NAME)) {
         printf("INVALID SIGNATURE_STREAM_NAME!\n");
+		ctx->err_flag = true;
         return false;
     }
 
-    if (efs_readable_size(cxt->buffer.buffer) < sizeof(EFS_STREAM_NAME_HEADER) +
-    cxt->current_stream_name.header.name_size) {
+    if (efs_readable_size(ctx->buffer.buffer) < sizeof(EFS_STREAM_NAME_HEADER) +
+    ctx->current_stream_name.header.name_size) {
         return false;
     }
 
-    efs_proceed(cxt->buffer.buffer, cxt->current_stream_name.header.size);
+    efs_proceed(ctx->buffer.buffer, ctx->current_stream_name.header.size);
 
     return true;
 }
 
-bool read_stream_data_header(efs_context *cxt) {
-    if (efs_readable_size(cxt->buffer.buffer) < sizeof(EFS_STREAM_DATA_HEADER)) {
+static bool
+read_stream_data_header(efs_context *ctx) {
+    if (efs_readable_size(ctx->buffer.buffer) < sizeof(EFS_STREAM_DATA_HEADER)) {
         return false;
     }
 
-    cxt->current_stream_data.header = *(EFS_STREAM_DATA_HEADER *)efs_current(cxt->buffer.buffer);
+    ctx->current_stream_data.header = *(EFS_STREAM_DATA_HEADER *)efs_current(ctx->buffer.buffer);
 
-    if (!check_signature(cxt->current_stream_data.header.signature, SIGNATURE_STREAM_DATA)) {
+    if (!check_signature(ctx->current_stream_data.header.signature, SIGNATURE_STREAM_DATA)) {
         printf("INVALID SIGNATURE_STREAM_DATA!\n");
+		ctx->err_flag = true;
         return false;
     }
 
-    cxt->current_stream_data.datasize = cxt->current_stream_data.header.size - sizeof(EFS_STREAM_DATA_HEADER);
-    cxt->current_stream_data.position = 0;
+    ctx->current_stream_data.position = 0;
 
-    if (memcmp(cxt->current_stream_name.data, (u8[2]){0x10, 0x19}, 2)) {
+
+    if (memcmp(ctx->current_stream_name.data, (u8[2]){0x10, 0x19}, 2)) {
+		ctx->current_stream_data.datasize = ctx->current_stream_data.header.size - sizeof(EFS_STREAM_DATA_HEADER);
         /*
          * This is a buffer of efsinfo. Set system.ntfs_efsinfo with file descriptor.
          */
-        cxt->is_efs_info = true;
+        ctx->is_efs_info = true;
+        efs_proceed(ctx->buffer.buffer, sizeof(ctx->current_stream_data.header));
     }
-
-    efs_proceed(cxt->buffer.buffer, sizeof(cxt->current_stream_data.header));
+	else if (memcmp(ctx->current_stream_name.data, (u16[7]){ ':', ':', '$', 'D', 'A', 'T', 'A' }, 14)) {
+        EFS_DATA_ENT *temp = (EFS_DATA_ENT *)efs_current(ctx->buffer.buffer);
+		ctx->current_stream_data.datasize = ctx->current_stream_data.header.size - sizeof(EFS_DATA_ENT);
+        /*
+         * This is a part of a raw encrypted data.
+         * If a size of a data is less then 66048 bytes(64KB + sizeof(EFS_DATA_ENT)),
+         * we can get efs_padding_size required for writing raw encrypted file with ntfs-3g.
+         */
+        if (ctx->current_stream_data.header.size < 0x10200) {
+            ctx->padding_size = temp->padded_size - temp->actual_size.s1;
+        }
+	}
+    else {
+        printf("INVALID STREAM NAME!");
+        return false;
+    }
 
     return true;
 }
 
-bool read_stream_data_value(efs_context *cxt) {
-    size_t bytes_to_read;
-    bytes_to_read = cxt->current_stream_data.datasize - cxt->current_stream_data.position;
+static
+bool read_stream_data_value(efs_context *ctx, void *p, size_t *st) {
+    size_t bytes_to_write = min(efs_readable_size(ctx->buffer.buffer), 
+        ctx->current_stream_data.datasize - ctx->current_stream_data.position);
 
-    if (bytes_to_read > efs_readable_size(cxt->buffer.buffer)) {
-        bytes_to_read = efs_readable_size(cxt->buffer.buffer);
-    }
-
-    if (cxt->is_efs_info) {
+    if (ctx->is_efs_info) {
         int ret;
-        ret = fsetxattr(cxt->fd, "system.ntfs_efsinfo", cxt->buffer.buffer, bytes_to_read, 0);
+        ret = fsetxattr(ctx->fd, "system.ntfs_efsinfo", efs_current(ctx->buffer.buffer), bytes_to_write, 0);
         if (ret) {
+			ctx->err_flag = true;
             return false;
         }
+		ctx->is_efs_info = false;
     }
+	else {
+		efs_proceed(ctx->buffer.buffer, sizeof(EFS_DATA_ENT) - sizeof(ctx->current_stream_data.header));
+		bytes_to_write = min(efs_readable_size(ctx->buffer.buffer), 
+            ctx->current_stream_data.datasize - ctx->current_stream_data.position);
+		p = mempcpy(p, efs_current(ctx->buffer.buffer), bytes_to_write);
+		*st += bytes_to_write;
+	}
 
-    efs_proceed(cxt->buffer.buffer, bytes_to_read);
-    cxt->current_stream_data.position += bytes_to_read;
+    efs_proceed(ctx->buffer.buffer, bytes_to_write);
+    ctx->current_stream_data.position += bytes_to_write;
 
-    
-
-    if (cxt->current_stream_data.position < cxt->current_stream_data.datasize) {
+    if (ctx->current_stream_data.position < ctx->current_stream_data.datasize) {
         return false;
     }
+
+	return true;
+}
+
+bool
+efs_parse_chunk(const void *p, const void *efs_p, size_t *len, efs_context *ctx) {
+    ctx->buffer.buffer = MALLOC(*len);
+    memcpy(ctx->buffer.buffer, p, *len);
+	size_t write_byte = 0;
+
+	void *write_p = efs_p; //* ptr to write data to
+	PARSE_STATE next;
+	bool finish;
+
+	while (efs_readable_size(ctx->buffer.buffer) > 0) {
+		switch (ctx->parse_state) {
+		case ROOT_HEADER_STATE:
+			finish = read_root_header(ctx);
+			if (finish) {
+				ctx->parse_state = STRM_HEADER_STATE;
+			}
+			else if (ctx->err_flag) {
+				return false;
+			}
+			else {
+				return true;
+				// read more
+			}
+		case STRM_HEADER_STATE:
+			next = read_stream_header(ctx);
+			if (next == NULL_STATE) {
+				return true;
+				// read more
+			}
+			else if (ctx->err_flag) {
+				return false;
+			}
+			else {
+				ctx->parse_state = next;
+			}
+		case STRM_NAME_STATE:
+			finish = read_stream_name(ctx);
+			if (finish) {
+				ctx->parse_state = STRM_HEADER_STATE;
+			}
+			else if (ctx->err_flag) {
+				return false;
+			}
+			else {
+				return true;
+				// read more
+			}
+		case STRM_DATA_HEADER_STATE:
+			finish = read_stream_data_header;
+			if (finish) {
+				ctx->parse_state = STRM_DATA_VALUE_STATE;
+			}
+			else if (ctx->err_flag) {
+				return false;
+			}
+			else {
+				return true;
+				// read more
+			}
+		case STRM_DATA_VALUE_STATE:
+			finish = read_stream_data_value(ctx, write_p, &write_byte);
+			if (finish) {
+				ctx->parse_state = STRM_HEADER_STATE;
+			}
+			else if (ctx->err_flag) {
+				return false;
+			}
+			else {
+				return true;
+				// read more
+			}
+		}
+	}
+	FREE(ctx->buffer.buffer);
+
+	if (write_byte < *len) {
+		*len = write_byte;
+	}
+
+    return 0;
 }

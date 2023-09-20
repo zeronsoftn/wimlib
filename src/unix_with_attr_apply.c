@@ -132,8 +132,9 @@ struct unix_with_attr_apply_ctx {
 	/* Size allocated in @data_buffer  */
 	size_t data_buffer_size;
 
-	/* Context for encrypted file that is being written  */
-	efs_context efs_cxt;
+	/* For each currently open file,
+	 * Context for encrypted file that is being written  */
+	efs_context *efs_ctx[MAX_OPEN_FILES];
 
 	/* Temporary buffer for reparse data  */
 	struct reparse_buffer_disk rpbuf;
@@ -777,6 +778,8 @@ unix_create_if_directory(const struct wim_dentry *dentry,
 
 	unix_set_dos_name(dentry, path);
 
+	/* If a directory is a encrypted directory, */
+
 	return report_file_created(&ctx->common);
 }
 
@@ -979,7 +982,8 @@ unix_begin_extract_blob_instance(const struct blob_descriptor *blob,
 	if (unlikely(strm->stream_type == STREAM_TYPE_EFSRPC_RAW_DATA)) {
 		ctx->is_efsraw_file[ctx->num_open_fds] = true;
 		ctx->efs_file_offset[ctx->num_open_fds] = 0;
-		ctx->efs_cxt = (efs_context) {
+		ctx->efs_ctx[ctx->num_open_fds] = MALLOC(sizeof(efs_context));
+		*ctx->efs_ctx[ctx->num_open_fds] = (efs_context) {
 			.parse_state = ROOT_HEADER_STATE,
 			.buffer = NULL,
 			.efs_header = NULL,
@@ -999,10 +1003,15 @@ unix_begin_extract_blob_instance(const struct blob_descriptor *blob,
 				.datasize = 0,
 				.position = 0,
 				.buffer = NULL,
-				.fd = 0
 			},
-			.is_efs_info = false
+			.err_flag = false,
+			.is_efs_info = false,
+			.fd = 0,
+			.padding_size = 0
 		};
+	}
+	else {
+		ctx->is_efsraw_file[ctx->num_open_fds] = false;
 	}
 
 	wimlib_assert(stream_is_unnamed_data_or_encrypted_stream(strm));
@@ -1030,6 +1039,9 @@ retry_create:
 		posix_fallocate(fd, 0, blob->size);
 #endif
 	}
+	if (ctx->is_efsraw_file[ctx->num_open_fds]) {
+		ctx->efs_ctx[ctx->num_open_fds]->fd = fd;
+	}
 	filedes_init(&ctx->open_fds[ctx->num_open_fds++], fd);
 
 	/* Set DOS name of file if exists */
@@ -1049,13 +1061,6 @@ unix_begin_extract_blob(struct blob_descriptor *blob, void *_ctx)
 	ctx->num_open_fds = 0;
 	ctx->data_buffer_ptr = NULL;
 	ctx->any_sparse_files = false;
-	ctx->efs_cxt = (efs_context) {
-		.parse_state = NULL_STATE,
-		.buffer = NULL,
-		.efs_header = NULL,
-		.current_stream_name = NULL,
-		.current_stream_data = NULL
-	};
 	INIT_LIST_HEAD(&ctx->reparse_dentries);
 
 	for (u32 i = 0; i < blob->out_refcnt; i++) {
@@ -1084,10 +1089,9 @@ unix_extract_chunk(const struct blob_descriptor *blob, u64 offset,
 	size_t len;
 	unsigned i;
 	int ret;
-	void *efs_p;
-	bool parse_ret;
 
-	size_t efs_len = 0; //* The size of a written bytes of raw encrypted data.
+	bool parse_ret;
+	size_t efs_len = 0; //* The size of a byte to write for efs file
 
 	/* 
 	 * This is where we handle encrypted files,
@@ -1107,33 +1111,31 @@ unix_extract_chunk(const struct blob_descriptor *blob, u64 offset,
 						    ctx->any_sparse_files);
 
 		/*
-		 * Parse EFSRPC data to acquire and write encrypted data.
+		 * Parse EFSRPC data to get and write encrypted data.
 		 */
 		for (i = 0; i < ctx->num_open_fds; i++) {
 			if (ctx->is_efsraw_file[i]) {
+				void *efs_p = MALLOC(len);
 				efs_len = len;
-				parse_ret = efs_parse_chunk(efs_p, &efs_len, &ctx->efs_cxt);
+				parse_ret = efs_parse_chunk(p, efs_p, &efs_len, ctx->efs_ctx[i]);
 				if (!parse_ret) {
 					goto err;
 				}
 				ret =full_pwrite(&ctx->open_fds[i],
 					efs_p, efs_len,
 					ctx->efs_file_offset[i]);
-				goto write_end;
+				ctx->efs_file_offset[i] += efs_len;
+				FREE(efs_p);
+
+				continue;
 			}
-			
-			if (!zeroes || !ctx->is_sparse_file[i]) {
+			else if (!zeroes || !ctx->is_sparse_file[i]) {
 				ret = full_pwrite(&ctx->open_fds[i],
 						  p, len, offset);
 				if (ret)
 					goto err;
 			}
 		}
-	}
-
-write_end:
-	if (efs_p) {
-		FREE(efs_p);
 	}
 
 	if (ctx->data_buffer_ptr)
@@ -1173,6 +1175,24 @@ unix_end_extract_blob(struct blob_descriptor *blob, int status, void *_ctx)
 			break;
 		}
 
+		/* set last 2 bytes of encrypted file and
+		 * free encrypted file context if exists.
+		 */
+		if (ctx->is_efsraw_file[i] && ctx->efs_ctx[i]) {
+			ret = full_pwrite(fd->fd, &ctx->efs_ctx[i]->padding_size,
+						2, ctx->efs_file_offset[i]);
+			// ctx->efs_file_offset[i] += 2;
+
+			FREE(ctx->efs_ctx[i]);
+
+			if (ret) {
+				ERROR_WITH_ERRNO("Failed to write efs padding size of \"%s\"!",
+						unix_build_inode_extraction_path(inode, ctx));
+			}
+			ret = WIMLIB_ERR_WRITE;
+			break;
+		}
+
 		/* Set metadata on regular file just before closing.  */
 		ret = unix_set_metadata(fd->fd, inode, NULL, ctx);
 		if (ret)
@@ -1184,7 +1204,6 @@ unix_end_extract_blob(struct blob_descriptor *blob, int status, void *_ctx)
 			ret = WIMLIB_ERR_WRITE;
 			break;
 		}
-
 	}
 
 	unix_cleanup_open_fds(ctx, 0);
@@ -1221,10 +1240,6 @@ unix_end_extract_blob(struct blob_descriptor *blob, int status, void *_ctx)
 			}
 		}
 	}
-
-	/* -----------TODO------------ 
-		Extract efs files and directories.
-	*/
 
 	return 0;
 }

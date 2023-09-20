@@ -34,9 +34,9 @@ typedef struct _EFS_STREAM_HEADER {
 typedef struct _EFS_STREAM_NAME_HEADER {
 	u32 size;
 	utf16lechar signature[4]; //* signature "NTFS"
-	u32 unknown_0x20;
-	u32 unknown_0x24;
-	u32 unknown_0x28;
+	u32 unknown_0x0c;
+	u32 unknown_0x10;
+	u32 unknown_0x14;
 	u32 name_size;
 	// void *name;
 } __attribute__((packed)) EFS_STREAM_NAME_HEADER;
@@ -47,13 +47,10 @@ typedef struct _EFS_STREAM_DATA_HEADER {
 	u32 unknown_0x0c;
 } __attribute__((packed)) EFS_STREAM_DATA_HEADER;
 
-
-
 /* Can have more than one if file is bigger than 64KB */
 typedef struct _DATA_ENTRY_HEADER {
-	u32 size; //* max 66048 bytes
-	utf16lechar signature[4]; //* signature "GURE"
-	u32 unknown_0x0c[4]; //* "........ð........."
+	EFS_STREAM_DATA_HEADER STREAM_HEADER;
+	u32 unknown_0x10[3]; //* "........ð..."
 	struct __attribute__((packed)) {
 		u32 s1;
 		u32 s2;
@@ -66,49 +63,27 @@ typedef struct _DATA_ENTRY_HEADER {
 	u8 unknown_0x32[8]; //* "EXTD...."
 	u8 unknown_zeros[456]; //* 456 zeros..?
 	// void* data;
-} __attribute__((packed)) EFS_DATA;
+} __attribute__((packed)) EFS_DATA_ENT;
 
 /* EFS_INFO part in encrypted file. */
 typedef struct _EFS_INFO {
 	EFS_STREAM_NAME_HEADER STREAM_NAME;
-
-	struct __attribute__((packed)) {
-		u32 size;
-		utf16lechar signature[4]; //* unicode "GURE"
-		u32 unknown_0x0c;
-		// void *buffer; //* starting address of EFS_INFO
-	} STREAM_DATA;
+	EFS_STREAM_DATA_HEADER STREAM_DATA;
+	// void *data;
 } __attribute__((packed)) EFS_INFO;
 
 /* EFS_DATA part in encrypted file. */
 typedef struct _EFS_DATA {
 	EFS_STREAM_NAME_HEADER STREAM_NAME;
-
-	/* Can have more than one if file is bigger than 64KB */
-	struct __attribute__((packed)) {
-		u32 size; //* max 66048 bytes
-		utf16lechar signature[4]; //* signature "GURE"
-		u32 unknown_0x0c[4]; //* "........ð........."
-		struct __attribute__((packed)) {
-			u32 s1;
-			u32 s2;
-			/* s1 = s2(?) */
-		} actual_size; //* size of actual data, limited to 65536 bytes(64KB)
-		u16 unknown_0x24;
-		u8 unknown_0x26[2]; //* 0x09-0x10 when size is each 0-512,513-1024,...,32769-65536(64KB) bytes..?
-        u32 unknown_0x28;
-        u32 padded_size; //* size padded with 512 bytes
-        u8 unknown_0x32[8]; //* "EXTD...."
-		u8 unknown_zeros[456]; //* 456 zeros..?
-	} STREAM_DATA;
+	EFS_DATA_ENT STREAM_DATA_HEAD;
 } __attribute__((packed)) EFS_DATA;
 
 enum PARSE_STATE {
 	NULL_STATE = -1,
 
-    ROOT_HEADER_STATE,
-    STRM_HEADER_STATE,
-    STRM_NAME_STATE,
+	ROOT_HEADER_STATE,
+	STRM_HEADER_STATE,
+	STRM_NAME_STATE,
 	STRM_DATA_HEADER_STATE,
 	STRM_DATA_VALUE_STATE
 };
@@ -144,26 +119,11 @@ typedef struct _efs_context {
 	EFS_STREAM_DATA current_stream_data;
 
 	bool is_efs_info;
+	bool err_flag;
+
 	int fd;
+	u16 padding_size;
 } efs_context;
 
 bool
-check_signature(utf16lechar *a, utf16lechar *b);
-
-inline void *
-efs_current(efs_buffer* buf);
-
-inline size_t
-efs_readable_size(efs_buffer *buf);
-
-void
-efs_append(efs_buffer *buf, void *p, size_t len);
-
-inline void
-efs_proceed(efs_buffer *buf, size_t length);
-
-void
-efs_cleanup(efs_buffer *buf);
-
-bool
-efs_parse_chunk(const void *p, size_t *len, efs_context *cxt);
+efs_parse_chunk(const void *p, const void *efs_p, size_t *len, efs_context *cxt);
