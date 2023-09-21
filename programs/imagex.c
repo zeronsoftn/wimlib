@@ -242,7 +242,7 @@ static const struct option apply_options[] = {
 	{T("wimboot"),     no_argument,       NULL, IMAGEX_WIMBOOT_OPTION},
 	{T("compact"),     required_argument, NULL, IMAGEX_COMPACT_OPTION},
 	{T("recover-data"), no_argument,      NULL, IMAGEX_RECOVER_DATA_OPTION},
-	{T("unix-with-xattr"), no_argument,   NULL, IMAGEX_UNIX_NTFS_3G_XATTR_OPTION},
+	{T("unix-ntfs-3g-xattr"), no_argument,   NULL, IMAGEX_UNIX_NTFS_3G_XATTR_OPTION},
 	{NULL, 0, NULL, 0},
 };
 
@@ -1610,7 +1610,7 @@ imagex_apply(int argc, tchar **argv, int cmd)
 			extract_flags |= WIMLIB_EXTRACT_FLAG_RECOVER_DATA;
 			break;
 		case IMAGEX_UNIX_NTFS_3G_XATTR_OPTION:
-			extract_flags |= WIMLIB_EXTRACT_FLAG_UNIX_WITH_NTFS_3G_XATTR;
+			extract_flags |= WIMLIB_EXTRACT_FLAG_UNIX_NTFS_3G_XATTR;
 			break;
 		default:
 			goto out_usage;
@@ -4372,7 +4372,7 @@ T(
 "                    [--check] [--ref=\"GLOB\"] [--no-acls] [--strict-acls]\n"
 "                    [--no-attributes] [--rpfix] [--norpfix]\n"
 "                    [--include-invalid-names] [--wimboot] [--unix-data]\n"
-"                    [--compact=FORMAT] [--recover-data] [--unix-with-xattr]\n"
+"                    [--compact=FORMAT] [--recover-data] [--unix-ntfs-3g-xattr]\n"
 ),
 [CMD_CAPTURE] =
 T(

@@ -1,5 +1,5 @@
 /*
- * unix_efs.h: Declaration for processing efs raw data from wim in linux
+ * unix_ntfs-3g_xattr_efs.h: Declaration for processing efs raw data from wim in linux
  * using ntfs-3g xattr.
 */
 
@@ -67,15 +67,15 @@ typedef struct _DATA_ENTRY_HEADER {
 
 /* EFS_INFO part in encrypted file. */
 typedef struct _EFS_INFO {
-	EFS_STREAM_NAME_HEADER STREAM_NAME;
-	EFS_STREAM_DATA_HEADER STREAM_DATA;
+	EFS_STREAM_NAME_HEADER stream_name;
+	EFS_STREAM_DATA_HEADER stream_data;
 	// void *data;
 } __attribute__((packed)) EFS_INFO;
 
 /* EFS_DATA part in encrypted file. */
 typedef struct _EFS_DATA {
-	EFS_STREAM_NAME_HEADER STREAM_NAME;
-	EFS_DATA_ENT STREAM_DATA_HEAD;
+	EFS_STREAM_NAME_HEADER stream_name;
+	EFS_DATA_ENT stream_data_head;
 } __attribute__((packed)) EFS_DATA;
 
 enum PARSE_STATE {
