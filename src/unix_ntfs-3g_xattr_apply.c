@@ -1,5 +1,5 @@
 /*
- * unix_apply_with_attr.c - Code to apply files from a WIM image to directory on UNIX with NTFS attributes using xattr.
+ * unix_ntfs-3g_xattr_apply.c - Code to apply files from a WIM image to directory on UNIX with NTFS attributes using xattr.
  * The target directory should be mounted with ntfs-3g, with efs_raw option for efs extraction to work.
  */
 
@@ -49,9 +49,9 @@
 #include "wimlib/reparse.h"
 #include "wimlib/scan.h"
 #include "wimlib/timestamp.h"
-#include "wimlib/unix_efs.h"
 #include "wimlib/unix_data.h"
-#include "wimlib/unix_ntfs_3g_xattr.h"
+#include "wimlib/unix_ntfs-3g_xattr.h"
+#include "wimlib/unix_ntfs-3g_xattr_efs.h"
 #include "wimlib/xattr.h"
 
 /* We don't require O_NOFOLLOW, but the advantage of having it is that if we
@@ -135,6 +135,11 @@ struct unix_with_attr_apply_ctx {
 	/* For each currently open file,
 	 * Context for encrypted file that is being written  */
 	efs_context *efs_ctx[MAX_OPEN_FILES];
+
+	/* List of encrypted directories, joined by @d_tmp_list, that need to have
+	 * efsinfo after the directory is created.
+	 */
+	struct list_head efs_dirs;
 
 	/* Temporary buffer for reparse data  */
 	struct reparse_buffer_disk rpbuf;
@@ -617,7 +622,7 @@ unix_set_metadata(int fd, const struct wim_inode *inode,
 		WARNING_WITH_ERRNO("\"%s\": unable to set timestamps", path);
 	}
 
-	//* set ntfs file attribute with ntfs-3g attribute - compression attribute handled here?
+	//* set ntfs file attribute with ntfs-3g attribute - only directory attributes are handled
 	ret =  fd > 0 ? fsetxattr(fd, "system.ntfs_attrib", &inode->i_attributes, sizeof(inode->i_attributes), 0) : 
 	lsetxattr(path, "system.ntfs_attrib", &inode->i_attributes, sizeof(inode->i_attributes), 0);
 	if (ret) {
@@ -627,7 +632,7 @@ unix_set_metadata(int fd, const struct wim_inode *inode,
 	//* set ntfs file time with ntfs-3g attribute - automatically set when setting unix timestamp in ntfs-3g mount point?
 	u64 buf[4] = { inode->i_creation_time, inode->i_last_write_time, inode->i_last_access_time, (u64)0 };
 	ret = fd > 0 ? fsetxattr(fd, "system.ntfs_times", buf, sizeof(buf), 0) : 
-	lsetxattr(path, "system.ntfs_times", buf, sizeof(buf), 0);
+				lsetxattr(path, "system.ntfs_times", buf, sizeof(buf), 0);
 	if (ret) {
 		if (!path)
 			path = unix_build_inode_extraction_path(inode, ctx);
@@ -641,7 +646,7 @@ unix_set_metadata(int fd, const struct wim_inode *inode,
 	object_id = inode_get_object_id(inode, &len);
 	if (unlikely(object_id != NULL)) {
 		ret = fd > 0 ? fsetxattr(fd, "system.ntfs_object_id", object_id, len, 0) : 
-		lsetxattr(path, "system.ntfs_object_id", object_id, len, 0);
+					lsetxattr(path, "system.ntfs_object_id", object_id, len, 0);
 		if (ret) {
 			if (!path)
 				path = unix_build_inode_extraction_path(inode, ctx);
@@ -669,7 +674,7 @@ unix_set_metadata(int fd, const struct wim_inode *inode,
 		desc_size = sd->sizes[inode->i_security_id];
 
 		ret = fd > 0 ? fsetxattr(fd, "system.ntfs_acl", desc, desc_size, 0) : 
-		lsetxattr(path, "system.ntfs_acl", desc, desc_size, 0);
+					lsetxattr(path, "system.ntfs_acl", desc, desc_size, 0);
 		if (ret) {
 			if (!path)
 				path = unix_build_inode_extraction_path(inode, ctx);
@@ -980,25 +985,40 @@ unix_begin_extract_blob_instance(const struct blob_descriptor *blob,
 	}
 
 	if (unlikely(strm->stream_type == STREAM_TYPE_EFSRPC_RAW_DATA)) {
+		/*
+		 * Encrypted directory
+		 */
+		if (dentry->d_inode->i_attributes & FILE_ATTRIBUTE_DIRECTORY) {
+			if (!prepare_data_buffer(ctx, blob->size))
+				return WIMLIB_ERR_NOMEM;
+			list_add_tail(&dentry->d_tmp_list, &ctx->efs_dirs);
+			return 0;
+		}
+
 		ctx->is_efsraw_file[ctx->num_open_fds] = true;
 		ctx->efs_file_offset[ctx->num_open_fds] = 0;
 		ctx->efs_ctx[ctx->num_open_fds] = MALLOC(sizeof(efs_context));
 		*ctx->efs_ctx[ctx->num_open_fds] = (efs_context) {
 			.parse_state = ROOT_HEADER_STATE,
 			.buffer = NULL,
-			.efs_header = NULL,
+			.efs_header = (EFS_HEADER) {
+				.signature = { 0, },
+				.unknown_0xc = 0,
+				.unknown_0x10 = 0,
+				.version = 0
+			},
 			.current_stream_name = (EFS_STREAM_NAME) {
 				.header = (EFS_STREAM_NAME_HEADER) {
 					.size = 0,
 					.name_size = 0,
-					.signature = NULL
+					.signature = { 0, }
 				},
-				.data = NULL
+				.data = (EFS_STREAM_NAME *)(NULL)
 			},
 			.current_stream_data = (EFS_STREAM_DATA) {
 				.header = (EFS_STREAM_DATA_HEADER) {
 					.size = 0,
-					.signature = NULL
+					.signature = { 0, }
 				},
 				.datasize = 0,
 				.position = 0,
@@ -1111,7 +1131,7 @@ unix_extract_chunk(const struct blob_descriptor *blob, u64 offset,
 						    ctx->any_sparse_files);
 
 		/*
-		 * Parse EFSRPC data to get and write encrypted data.
+		 * Parse EFSRPC data to read and write encrypted data.
 		 */
 		for (i = 0; i < ctx->num_open_fds; i++) {
 			if (ctx->is_efsraw_file[i]) {
@@ -1124,6 +1144,8 @@ unix_extract_chunk(const struct blob_descriptor *blob, u64 offset,
 				ret =full_pwrite(&ctx->open_fds[i],
 					efs_p, efs_len,
 					ctx->efs_file_offset[i]);
+				if (ret)
+					goto err;
 				ctx->efs_file_offset[i] += efs_len;
 				FREE(efs_p);
 
@@ -1135,9 +1157,12 @@ unix_extract_chunk(const struct blob_descriptor *blob, u64 offset,
 				if (ret)
 					goto err;
 			}
-		}
+		}	
 	}
 
+	/* For reparse points and encrypted directories,
+	 * copy data into data_buffer to use it later.
+	 */
 	if (ctx->data_buffer_ptr)
 		ctx->data_buffer_ptr = mempcpy(ctx->data_buffer_ptr, chunk, size);
 	return 0;
@@ -1175,13 +1200,15 @@ unix_end_extract_blob(struct blob_descriptor *blob, int status, void *_ctx)
 			break;
 		}
 
-		/* set last 2 bytes of encrypted file and
+		/* Set last 2 bytes of encrypted file and
 		 * free encrypted file context if exists.
+		 * Truncate encrypted file size to its actual size.
 		 */
 		if (ctx->is_efsraw_file[i] && ctx->efs_ctx[i]) {
-			ret = full_pwrite(fd->fd, &ctx->efs_ctx[i]->padding_size,
+			ret = full_pwrite(fd, &ctx->efs_ctx[i]->padding_size,
 						2, ctx->efs_file_offset[i]);
-			// ctx->efs_file_offset[i] += 2;
+			ctx->efs_file_offset[i] += 2;
+			ftruncate(fd->fd, ctx->efs_file_offset[i]);
 
 			FREE(ctx->efs_ctx[i]);
 
@@ -1238,6 +1265,48 @@ unix_end_extract_blob(struct blob_descriptor *blob, int status, void *_ctx)
 			if (ret) {
 				return ret;
 			}
+		}
+	}
+
+	if (!list_empty(&ctx->efs_dirs)) {
+		efs_context efs_ctx = (efs_context) {
+			.parse_state = ROOT_HEADER_STATE,
+			.buffer = NULL,
+			.efs_header = (EFS_HEADER) {
+				.signature = { 0, },
+				.unknown_0xc = 0,
+				.unknown_0x10 = 0,
+				.version = 0
+			},
+			.current_stream_name = (EFS_STREAM_NAME) {
+				.header = (EFS_STREAM_NAME_HEADER) {
+					.size = 0,
+					.name_size = 0,
+					.signature = { 0, }
+				},
+				.data = (EFS_STREAM_NAME *)(NULL)
+			},
+			.current_stream_data = (EFS_STREAM_DATA) {
+				.header = (EFS_STREAM_DATA_HEADER) {
+					.size = 0,
+					.signature = { 0, }
+				},
+				.datasize = 0,
+				.position = 0,
+				.buffer = NULL,
+			},
+			.err_flag = false,
+			.is_efs_info = false,
+			.fd = 0,
+			.padding_size = 0
+		};
+		size_t efs_len = blob->size;
+
+		list_for_each_entry(dentry, &ctx->efs_dirs, d_tmp_list) {
+			/* As we only set efsinfo for directories,
+			 * we don't need pointer to save encrypted data.
+			 */
+			ret = efs_parse_chunk(ctx->data_buffer, NULL, &efs_len, &efs_ctx);
 		}
 	}
 
@@ -1356,8 +1425,8 @@ out:
 	return ret;
 }
 
-const struct apply_operations unix_with_attr_apply_ops = {
-	.name			= "UNIX_WITH_ATTR",
+const struct apply_operations unix_ntfs_3g_xattr_apply_ops = {
+	.name			= "UNIX_NTFS_3G_XATTR",
 	.get_supported_features = unix_with_attr_get_supported_features,
 	.extract                = unix_with_attr_extract,
 	.context_size           = sizeof(struct unix_with_attr_apply_ctx),

@@ -2077,7 +2077,7 @@ typedef int (*wimlib_iterate_lookup_table_callback_t)(const struct wimlib_resour
 
 /** Extract using extended attributes provided by ntfs-3g driver.
 */
-#define WIMLIB_EXTRACT_FLAG_UNIX_WITH_NTFS_3G_XATTR 0x00800000
+#define WIMLIB_EXTRACT_FLAG_UNIX_NTFS_3G_XATTR 0x00800000
 
 /**
  * Since wimlib v1.8.2 and Windows-only: compress the extracted files using

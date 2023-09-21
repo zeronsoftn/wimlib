@@ -42,7 +42,6 @@
 #include "wimlib/sha1.h"
 #include "wimlib/wim.h"
 #include "wimlib/win32.h"
-#include "wimlib/unix_efs.h"
 
 /*
  *                         Compressed WIM resources
@@ -78,11 +77,6 @@
  *   chunk is prefixed with its compressed size as a 32-bit integer.  This
  *   format allows a resource to be written without rewinding.
  */
-
-union {
-	/* Links blobs for writing blob table.  */
-	struct list_head blob_table_list;
-};
 
 struct data_range {
 	u64 offset;

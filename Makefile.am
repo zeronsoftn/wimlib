@@ -183,10 +183,10 @@ libwim_la_SOURCES += src/wimboot.c			\
 PLATFORM_LIBS = -lntdll
 else
 libwim_la_SOURCES += src/unix_apply.c		\
-			 src/unix_with_attr_apply.c		\
+			 src/unix_ntfs-3g_xattr_apply.c		\
 		     src/unix_capture.c				\
-			 src/unix_efs.c 			\
-			 include/wimlib/unix_efs.h
+			 src/unix_ntfs-3g_xattr_efs.c 			\
+			 include/wimlib/unix_ntfs-3g_xattr_efs.h
 
 PLATFORM_LIBS =
 endif
