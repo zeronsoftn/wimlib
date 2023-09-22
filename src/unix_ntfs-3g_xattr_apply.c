@@ -92,7 +92,7 @@ unix_with_attr_get_supported_features(const char *target,
 
 #define NUM_PATHBUFS 2  /* We need 2 when creating hard links  */
 
-struct unix_with_attr_apply_ctx {
+struct unix_ntfs_3g_xattr_apply_ctx {
 	/* Extract flags, the pointer to the WIMStruct, etc.  */
 	struct apply_ctx common;
 
@@ -115,12 +115,6 @@ struct unix_with_attr_apply_ctx {
 
 	/* Whether is_sparse_file[] is true for any currently open file  */
 	bool any_sparse_files;
-
-	/* For each currently open file, whether the file is EFSRPC raw data format */
-	bool is_efsraw_file[MAX_OPEN_FILES];
-
-	/* Offset of currently open encrypted file */
-	u64 efs_file_offset[MAX_OPEN_FILES];
 
 	/* Allocated buffer for reading blob data when it cannot be extracted
 	 * directly  */
@@ -187,7 +181,7 @@ unix_dentry_path_length(const struct wim_dentry *dentry)
  * path to the target directory itself.  */
 static size_t
 unix_compute_path_max(const struct list_head *dentry_list,
-		      const struct unix_with_attr_apply_ctx *ctx)
+		      const struct unix_ntfs_3g_xattr_apply_ctx *ctx)
 {
 	size_t max = 0;
 	size_t len;
@@ -207,7 +201,7 @@ unix_compute_path_max(const struct list_head *dentry_list,
  * This cycles through NUM_PATHBUFS different buffers.  */
 static const char *
 unix_build_extraction_path(const struct wim_dentry *dentry,
-			   struct unix_with_attr_apply_ctx *ctx)
+			   struct unix_ntfs_3g_xattr_apply_ctx *ctx)
 {
 	char *pathbuf;
 	char *p;
@@ -237,7 +231,7 @@ unix_build_extraction_path(const struct wim_dentry *dentry,
 /* This causes the next call to unix_build_extraction_path() to use the same
  * path buffer as the previous call.  */
 static void
-unix_reuse_pathbuf(struct unix_with_attr_apply_ctx *ctx)
+unix_reuse_pathbuf(struct unix_ntfs_3g_xattr_apply_ctx *ctx)
 {
 	ctx->which_pathbuf = (ctx->which_pathbuf - 1) % NUM_PATHBUFS;
 }
@@ -246,7 +240,7 @@ unix_reuse_pathbuf(struct unix_with_attr_apply_ctx *ctx)
  * alias of the @inode.  This cycles through NUM_PATHBUFS different buffers.  */
 static const char *
 unix_build_inode_extraction_path(const struct wim_inode *inode,
-				 struct unix_with_attr_apply_ctx *ctx)
+				 struct unix_ntfs_3g_xattr_apply_ctx *ctx)
 {
 	return unix_build_extraction_path(inode_first_extraction_dentry(inode), ctx);
 }
@@ -325,7 +319,7 @@ unix_set_mode(int fd, const char *path, mode_t mode)
 /* Apply extended attributes to a file */
 static int
 apply_linux_xattrs(int fd, const struct wim_inode *inode,
-		   const char *path, struct unix_with_attr_apply_ctx *ctx,
+		   const char *path, struct unix_ntfs_3g_xattr_apply_ctx *ctx,
 		   const void *entries, size_t entries_size, bool is_old_format)
 {
 	const void * const entries_end = entries + entries_size;
@@ -417,7 +411,7 @@ apply_linux_xattrs(int fd, const struct wim_inode *inode,
  */
 static int
 apply_unix_metadata(int fd, const struct wim_inode *inode,
-		    const char *path, struct unix_with_attr_apply_ctx *ctx)
+		    const char *path, struct unix_ntfs_3g_xattr_apply_ctx *ctx)
 {
 	bool have_dat;
 	struct wimlib_unix_data dat;
@@ -481,7 +475,7 @@ apply_unix_metadata(int fd, const struct wim_inode *inode,
 static int
 unix_set_ntfs_xattr(int fd, const struct wim_inode *inode,
 		  const char *path, 
-		  struct unix_with_attr_apply_ctx *ctx)
+		  struct unix_ntfs_3g_xattr_apply_ctx *ctx)
 {	
 	const void *entries, *entries_end;
 	u32 len;
@@ -595,7 +589,7 @@ unix_set_dos_name(const struct wim_dentry *dentry,
  */
 static int
 unix_set_metadata(int fd, const struct wim_inode *inode,
-		  const char *path, struct unix_with_attr_apply_ctx *ctx)
+		  const char *path, struct unix_ntfs_3g_xattr_apply_ctx *ctx)
 {
 	int ret;
 
@@ -690,7 +684,7 @@ unix_set_metadata(int fd, const struct wim_inode *inode,
 static int
 unix_create_hardlinks(const struct wim_inode *inode,
 		      const struct wim_dentry *first_dentry,
-		      const char *first_path, struct unix_with_attr_apply_ctx *ctx)
+		      const char *first_path, struct unix_ntfs_3g_xattr_apply_ctx *ctx)
 {
 	const struct wim_dentry *dentry;
 	const char *newpath;
@@ -717,7 +711,7 @@ unix_create_hardlinks(const struct wim_inode *inode,
 	as ntfs-3g needs a file entry to set extended attribute. */
 static int
 unix_prepare_reparse_points(const struct wim_dentry *dentry,
-			 struct unix_with_attr_apply_ctx *ctx)
+			 struct unix_ntfs_3g_xattr_apply_ctx *ctx)
 {
 	const char *path;
 	struct stat stbuf;
@@ -763,7 +757,7 @@ retry_create:
 /* If @dentry represents a directory, create it.  */
 static int
 unix_create_if_directory(const struct wim_dentry *dentry,
-			 struct unix_with_attr_apply_ctx *ctx)
+			 struct unix_ntfs_3g_xattr_apply_ctx *ctx)
 {
 	const char *path;
 	struct stat stbuf;
@@ -792,7 +786,7 @@ unix_create_if_directory(const struct wim_dentry *dentry,
  * its metadata, and create any needed hard links.  */
 static int
 unix_extract_if_empty_file(const struct wim_dentry *dentry,
-			   struct unix_with_attr_apply_ctx *ctx)
+			   struct unix_ntfs_3g_xattr_apply_ctx *ctx)
 {
 	const struct wim_inode *inode;
 	struct wimlib_unix_data unix_data;
@@ -868,7 +862,7 @@ unix_extract_if_empty_file(const struct wim_dentry *dentry,
 
 static int
 unix_create_dirs_and_empty_files(const struct list_head *dentry_list,
-				 struct unix_with_attr_apply_ctx *ctx)
+				 struct unix_ntfs_3g_xattr_apply_ctx *ctx)
 {
 	const struct wim_dentry *dentry;
 	int ret;
@@ -921,7 +915,7 @@ static int
 unix_set_reparse_data(const struct wim_dentry *dentry,
 	const struct reparse_buffer_disk *rpbuf,
 	u16 rpbuflen,
-	struct unix_with_attr_apply_ctx *ctx)
+	struct unix_ntfs_3g_xattr_apply_ctx *ctx)
 {
 	int ret;
 	const char *path;
@@ -936,7 +930,7 @@ unix_set_reparse_data(const struct wim_dentry *dentry,
 }
 
 static void
-unix_cleanup_open_fds(struct unix_with_attr_apply_ctx *ctx, unsigned offset)
+unix_cleanup_open_fds(struct unix_ntfs_3g_xattr_apply_ctx *ctx, unsigned offset)
 {
 	for (unsigned i = offset; i < ctx->num_open_fds; i++)
 		filedes_close(&ctx->open_fds[i]);
@@ -947,7 +941,7 @@ unix_cleanup_open_fds(struct unix_with_attr_apply_ctx *ctx, unsigned offset)
 /* Prepare to read the next blob, which has size @blob_size, into an in-memory
  * buffer.  */
 static bool
-prepare_data_buffer(struct unix_with_attr_apply_ctx *ctx, u64 blob_size)
+prepare_data_buffer(struct unix_ntfs_3g_xattr_apply_ctx *ctx, u64 blob_size)
 {
 	if (blob_size > ctx->data_buffer_size) {
 		/* Larger buffer needed.  */
@@ -971,7 +965,7 @@ static int
 unix_begin_extract_blob_instance(const struct blob_descriptor *blob,
 				 struct wim_dentry *dentry,
 				 const struct wim_inode_stream *strm,
-				 struct unix_with_attr_apply_ctx *ctx)
+				 struct unix_ntfs_3g_xattr_apply_ctx *ctx)
 {
 	int fd;
 	int ret;
@@ -985,53 +979,23 @@ unix_begin_extract_blob_instance(const struct blob_descriptor *blob,
 	}
 
 	if (unlikely(strm->stream_type == STREAM_TYPE_EFSRPC_RAW_DATA)) {
-		/*
-		 * Encrypted directory
-		 */
+
+		ctx->efs_ctx[ctx->num_open_fds] = MALLOC(sizeof(efs_context));
+		memset(ctx->efs_ctx[ctx->num_open_fds], 0, sizeof(efs_context));
+		ctx->efs_ctx[ctx->num_open_fds]->parse_state = NULL_STATE;
+
+		/* Collect encrypted directory entries for later process. */
 		if (dentry->d_inode->i_attributes & FILE_ATTRIBUTE_DIRECTORY) {
 			if (!prepare_data_buffer(ctx, blob->size))
 				return WIMLIB_ERR_NOMEM;
 			list_add_tail(&dentry->d_tmp_list, &ctx->efs_dirs);
 			return 0;
 		}
-
-		ctx->is_efsraw_file[ctx->num_open_fds] = true;
-		ctx->efs_file_offset[ctx->num_open_fds] = 0;
-		ctx->efs_ctx[ctx->num_open_fds] = MALLOC(sizeof(efs_context));
-		*ctx->efs_ctx[ctx->num_open_fds] = (efs_context) {
-			.parse_state = ROOT_HEADER_STATE,
-			.buffer = NULL,
-			.efs_header = (EFS_HEADER) {
-				.signature = { 0, },
-				.unknown_0xc = 0,
-				.unknown_0x10 = 0,
-				.version = 0
-			},
-			.current_stream_name = (EFS_STREAM_NAME) {
-				.header = (EFS_STREAM_NAME_HEADER) {
-					.size = 0,
-					.name_size = 0,
-					.signature = { 0, }
-				},
-				.data = (EFS_STREAM_NAME *)(NULL)
-			},
-			.current_stream_data = (EFS_STREAM_DATA) {
-				.header = (EFS_STREAM_DATA_HEADER) {
-					.size = 0,
-					.signature = { 0, }
-				},
-				.datasize = 0,
-				.position = 0,
-				.buffer = NULL,
-			},
-			.err_flag = false,
-			.is_efs_info = false,
-			.fd = 0,
-			.padding_size = 0
-		};
 	}
 	else {
-		ctx->is_efsraw_file[ctx->num_open_fds] = false;
+		if (ctx->efs_ctx[ctx->num_open_fds]) {
+			ctx->efs_ctx[ctx->num_open_fds] = NULL;
+		}
 	}
 
 	wimlib_assert(stream_is_unnamed_data_or_encrypted_stream(strm));
@@ -1059,7 +1023,7 @@ retry_create:
 		posix_fallocate(fd, 0, blob->size);
 #endif
 	}
-	if (ctx->is_efsraw_file[ctx->num_open_fds]) {
+	if (ctx->efs_ctx[ctx->num_open_fds]) {
 		ctx->efs_ctx[ctx->num_open_fds]->fd = fd;
 	}
 	filedes_init(&ctx->open_fds[ctx->num_open_fds++], fd);
@@ -1074,7 +1038,7 @@ retry_create:
 static int
 unix_begin_extract_blob(struct blob_descriptor *blob, void *_ctx)
 {
-	struct unix_with_attr_apply_ctx *ctx = _ctx;
+	struct unix_ntfs_3g_xattr_apply_ctx *ctx = _ctx;
 	const struct blob_extraction_target *targets = blob_extraction_targets(blob);
 	int ret;
 
@@ -1102,7 +1066,7 @@ static int
 unix_extract_chunk(const struct blob_descriptor *blob, u64 offset,
 		   const void *chunk, size_t size, void *_ctx)
 {
-	struct unix_with_attr_apply_ctx *ctx = _ctx;
+	struct unix_ntfs_3g_xattr_apply_ctx *ctx = _ctx;
 	const void *end = chunk + size;
 	const void *p;
 	bool zeroes;
@@ -1129,12 +1093,11 @@ unix_extract_chunk(const struct blob_descriptor *blob, u64 offset,
 	for (p = chunk; p != end; p += len, offset += len) {
 		zeroes = maybe_detect_sparse_region(p, end - p, &len,
 						    ctx->any_sparse_files);
-
 		/*
 		 * Parse EFSRPC data to read and write encrypted data.
 		 */
 		for (i = 0; i < ctx->num_open_fds; i++) {
-			if (ctx->is_efsraw_file[i]) {
+			if (ctx->efs_ctx[i]) {
 				void *efs_p = MALLOC(len);
 				efs_len = len;
 				parse_ret = efs_parse_chunk(p, efs_p, &efs_len, ctx->efs_ctx[i]);
@@ -1143,10 +1106,10 @@ unix_extract_chunk(const struct blob_descriptor *blob, u64 offset,
 				}
 				ret =full_pwrite(&ctx->open_fds[i],
 					efs_p, efs_len,
-					ctx->efs_file_offset[i]);
+					ctx->efs_ctx[i]->write_offset);
 				if (ret)
 					goto err;
-				ctx->efs_file_offset[i] += efs_len;
+				ctx->efs_ctx[i]->write_offset += efs_len;
 				FREE(efs_p);
 
 				continue;
@@ -1157,11 +1120,13 @@ unix_extract_chunk(const struct blob_descriptor *blob, u64 offset,
 				if (ret)
 					goto err;
 			}
-		}	
+			
+		}
+
 	}
 
-	/* For reparse points and encrypted directories,
-	 * copy data into data_buffer to use it later.
+	/* For reparse points and copy efsinfo data
+	 * into data_buffer to use it later.
 	 */
 	if (ctx->data_buffer_ptr)
 		ctx->data_buffer_ptr = mempcpy(ctx->data_buffer_ptr, chunk, size);
@@ -1176,7 +1141,7 @@ err:
 static int
 unix_end_extract_blob(struct blob_descriptor *blob, int status, void *_ctx)
 {
-	struct unix_with_attr_apply_ctx *ctx = _ctx;
+	struct unix_ntfs_3g_xattr_apply_ctx *ctx = _ctx;
 	int ret;
 	const char *path;
 	const struct blob_extraction_target *targets = blob_extraction_targets(blob);
@@ -1204,13 +1169,14 @@ unix_end_extract_blob(struct blob_descriptor *blob, int status, void *_ctx)
 		 * free encrypted file context if exists.
 		 * Truncate encrypted file size to its actual size.
 		 */
-		if (ctx->is_efsraw_file[i] && ctx->efs_ctx[i]) {
+		if (ctx->efs_ctx[i] && ctx->efs_ctx[i]->fd) {
 			ret = full_pwrite(fd, &ctx->efs_ctx[i]->padding_size,
-						2, ctx->efs_file_offset[i]);
-			ctx->efs_file_offset[i] += 2;
-			ftruncate(fd->fd, ctx->efs_file_offset[i]);
+						2, ctx->efs_ctx[i]->write_offset);
+			ctx->efs_ctx[i]->write_offset += 2;
+			ftruncate(fd->fd, ctx->efs_ctx[i]->write_offset);
 
 			FREE(ctx->efs_ctx[i]);
+			ctx->efs_ctx[i] = NULL;
 
 			if (ret) {
 				ERROR_WITH_ERRNO("Failed to write efs padding size of \"%s\"!",
@@ -1268,45 +1234,15 @@ unix_end_extract_blob(struct blob_descriptor *blob, int status, void *_ctx)
 		}
 	}
 
+	/* Write data of efsinfo to encrypted directories. */
 	if (!list_empty(&ctx->efs_dirs)) {
-		efs_context efs_ctx = (efs_context) {
-			.parse_state = ROOT_HEADER_STATE,
-			.buffer = NULL,
-			.efs_header = (EFS_HEADER) {
-				.signature = { 0, },
-				.unknown_0xc = 0,
-				.unknown_0x10 = 0,
-				.version = 0
-			},
-			.current_stream_name = (EFS_STREAM_NAME) {
-				.header = (EFS_STREAM_NAME_HEADER) {
-					.size = 0,
-					.name_size = 0,
-					.signature = { 0, }
-				},
-				.data = (EFS_STREAM_NAME *)(NULL)
-			},
-			.current_stream_data = (EFS_STREAM_DATA) {
-				.header = (EFS_STREAM_DATA_HEADER) {
-					.size = 0,
-					.signature = { 0, }
-				},
-				.datasize = 0,
-				.position = 0,
-				.buffer = NULL,
-			},
-			.err_flag = false,
-			.is_efs_info = false,
-			.fd = 0,
-			.padding_size = 0
-		};
-		size_t efs_len = blob->size;
-
+		efs_context temp;
 		list_for_each_entry(dentry, &ctx->efs_dirs, d_tmp_list) {
-			/* As we only set efsinfo for directories,
-			 * we don't need pointer to save encrypted data.
-			 */
-			ret = efs_parse_chunk(ctx->data_buffer, NULL, &efs_len, &efs_ctx);
+			memset(&temp, 0, sizeof(efs_context));
+			temp.parse_state = NULL_STATE;
+			temp.path = unix_build_extraction_path(dentry, ctx);
+			int ret;
+			ret = efs_parse_chunk(ctx->data_buffer, NULL, &blob->size, &temp);
 		}
 	}
 
@@ -1314,7 +1250,7 @@ unix_end_extract_blob(struct blob_descriptor *blob, int status, void *_ctx)
 }
 
 static int
-unix_set_dir_metadata(struct list_head *dentry_list, struct unix_with_attr_apply_ctx *ctx)
+unix_set_dir_metadata(struct list_head *dentry_list, struct unix_ntfs_3g_xattr_apply_ctx *ctx)
 {
 	const struct wim_dentry *dentry;
 	int ret;
@@ -1333,13 +1269,18 @@ unix_set_dir_metadata(struct list_head *dentry_list, struct unix_with_attr_apply
 }
 
 static int
-unix_with_attr_extract(struct list_head *dentry_list, struct apply_ctx *_ctx)
+unix_ntfs_3g_xattr_extract(struct list_head *dentry_list, struct apply_ctx *_ctx)
 {
 	int ret;
-	struct unix_with_attr_apply_ctx *ctx = (struct unix_with_attr_apply_ctx *)_ctx;
+	struct unix_ntfs_3g_xattr_apply_ctx *ctx = (struct unix_ntfs_3g_xattr_apply_ctx *)_ctx;
 	size_t path_max;
 	u64 dir_count;
 	u64 empty_file_count;
+
+	/* Set all efs context as NULL to decide if the file if encrypted */
+	for (unsigned i = 0; i < MAX_OPEN_FILES; i++) {
+		ctx->efs_ctx[i] = NULL;
+	}
 
 	/* Compute the maximum path length that will be needed, then allocate
 	 * some path buffers.  */
@@ -1428,6 +1369,6 @@ out:
 const struct apply_operations unix_ntfs_3g_xattr_apply_ops = {
 	.name			= "UNIX_NTFS_3G_XATTR",
 	.get_supported_features = unix_with_attr_get_supported_features,
-	.extract                = unix_with_attr_extract,
-	.context_size           = sizeof(struct unix_with_attr_apply_ctx),
+	.extract                = unix_ntfs_3g_xattr_extract,
+	.context_size           = sizeof(struct unix_ntfs_3g_xattr_apply_ctx),
 };

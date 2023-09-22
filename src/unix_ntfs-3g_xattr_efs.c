@@ -177,7 +177,9 @@ bool read_stream_data_value(efs_context *ctx, void *write_p, size_t *write_byte)
 		 * Set efsinfo for encrypted file or directory. May need to handle
 		 * extremely long efsinfo by saving efsinfo in additional buffer..?
 		 */
-		int ret = fsetxattr(ctx->fd, "system.ntfs_efsinfo", efs_current(&ctx->buffer), bytes_to_write, 0);
+		int ret = ctx->fd > 0 ? 
+			fsetxattr(ctx->fd, "system.ntfs_efsinfo", efs_current(&ctx->buffer), bytes_to_write, 0) : 
+			lsetxattr(ctx->path, "system.ntfs_efsinfo", efs_current(&ctx->buffer), bytes_to_write, 0);
 		if (ret) {
 			ctx->err_flag = true;
 			return false;
@@ -282,7 +284,7 @@ efs_parse_chunk(const void *p, const void *efs_p, size_t *len, efs_context *ctx)
 
 	FREE(ctx->buffer.buffer);
 
-	if (write_byte < *len) {
+	if (write_byte < *len && efs_p) {
 		*len = write_byte;
 	}
 
