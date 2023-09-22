@@ -178,14 +178,18 @@ bool read_stream_data_value(efs_context *ctx, void *write_p, size_t *write_byte)
 		*write_byte += bytes_to_write;
 		efs_proceed(&ctx->buffer, bytes_to_write);
 		ctx->current_stream_data.position += bytes_to_write;
-	}
 
-	if (ctx->current_stream_data.position < ctx->current_stream_data.datasize) {
-		return false;
-		// read more
+		if (ctx->current_stream_data.position < ctx->current_stream_data.datasize) {
+			return false;
+			// read more
+		}
 	}
 
 	if (ctx->is_efs_info) {
+		if (bytes_to_write < ctx->current_stream_data.datasize) {
+			return false;
+			// read more
+		}
 		int ret = ctx->fd > 0 ? 
 			fsetxattr(ctx->fd, "system.ntfs_efsinfo", efs_current(&ctx->buffer), bytes_to_write, 0) : 
 			lsetxattr(ctx->path, "system.ntfs_efsinfo", efs_current(&ctx->buffer), bytes_to_write, 0);
