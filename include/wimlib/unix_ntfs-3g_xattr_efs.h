@@ -72,12 +72,6 @@ typedef struct _EFS_INFO {
 	// void *data;
 } __attribute__((packed)) EFS_INFO;
 
-/* EFS_DATA part in encrypted file. */
-typedef struct _EFS_DATA {
-	EFS_STREAM_NAME_HEADER stream_name;
-	EFS_DATA_ENT stream_data_head;
-} __attribute__((packed)) EFS_DATA;
-
 enum PARSE_STATE {
 	NULL_STATE = -1,
 
@@ -122,7 +116,10 @@ typedef struct _efs_context {
 	bool err_flag;
 
 	int fd;
+	const char *path; // for writing efsinfo in encrypted directory
 	u16 padding_size;
+
+	u32 write_offset; // writing offset for raw encrypted data
 } efs_context;
 
 bool
