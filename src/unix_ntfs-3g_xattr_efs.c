@@ -6,11 +6,11 @@ check_signature(utf16lechar *a, utf16lechar *b) {
 	l1 = utf16le_len_chars(a);
 	l2 = utf16le_len_chars(b);
 
-	if (a != b) {
+	if (l1 != l2) {
 		return false;
 	}
 
-	return cmp_utf16le_strings(a, l1, b, l2, false);
+	return cmp_utf16le_strings(a, l1, b, l2, false) ? false : true;
 }
 
 static inline void *
@@ -112,6 +112,7 @@ read_stream_name(efs_context *ctx) {
 		return false;
 	}
 
+	ctx->current_stream_name.data = efs_current(&ctx->buffer) + sizeof(EFS_STREAM_NAME_HEADER);
 	efs_proceed(&ctx->buffer, ctx->current_stream_name.header.size);
 
 	return true;
@@ -134,7 +135,7 @@ read_stream_data_header(efs_context *ctx) {
 	ctx->current_stream_data.position = 0;
 
 
-	if (memcmp(ctx->current_stream_name.data, (u8[]){0x10, 0x19}, 2)) {
+	if (!memcmp(ctx->current_stream_name.data, (u8[]){0x10, 0x19}, 2)) {
 		ctx->current_stream_data.datasize = ctx->current_stream_data.header.size - sizeof(EFS_STREAM_DATA_HEADER);
 		/*
 		 * This is a buffer of efsinfo. Set system.ntfs_efsinfo with file descriptor.
@@ -142,7 +143,7 @@ read_stream_data_header(efs_context *ctx) {
 		ctx->is_efs_info = true;
 		efs_proceed(&ctx->buffer, sizeof(ctx->current_stream_data.header));
 	}
-	else if (memcmp(ctx->current_stream_name.data, (u16[]){ ':', ':', '$', 'D', 'A', 'T', 'A' }, 14)) {
+	else if (!memcmp(ctx->current_stream_name.data, (u16[]){ ':', ':', '$', 'D', 'A', 'T', 'A' }, 14)) {
 		if (efs_readable_size(&ctx->buffer) < sizeof(EFS_DATA_ENT)) {
 			return false;
 		}
@@ -172,11 +173,19 @@ bool read_stream_data_value(efs_context *ctx, void *write_p, size_t *write_byte)
 	size_t bytes_to_write = min(efs_readable_size(&ctx->buffer), 
 		ctx->current_stream_data.datasize - ctx->current_stream_data.position);
 
+	if (!ctx->is_efs_info) {
+		write_p = write_p ? mempcpy(write_p, efs_current(&ctx->buffer), bytes_to_write) : NULL;
+		*write_byte += bytes_to_write;
+		efs_proceed(&ctx->buffer, bytes_to_write);
+		ctx->current_stream_data.position += bytes_to_write;
+	}
+
+	if (ctx->current_stream_data.position < ctx->current_stream_data.datasize) {
+		return false;
+		// read more
+	}
+
 	if (ctx->is_efs_info) {
-		/*
-		 * Set efsinfo for encrypted file or directory. May need to handle
-		 * extremely long efsinfo by saving efsinfo in additional buffer..?
-		 */
 		int ret = ctx->fd > 0 ? 
 			fsetxattr(ctx->fd, "system.ntfs_efsinfo", efs_current(&ctx->buffer), bytes_to_write, 0) : 
 			lsetxattr(ctx->path, "system.ntfs_efsinfo", efs_current(&ctx->buffer), bytes_to_write, 0);
@@ -185,18 +194,9 @@ bool read_stream_data_value(efs_context *ctx, void *write_p, size_t *write_byte)
 			return false;
 		}
 		ctx->is_efs_info = false;
-	}
-	else {
-		write_p = write_p ? mempcpy(write_p, efs_current(&ctx->buffer), bytes_to_write) : NULL;
-		*write_byte += bytes_to_write;
-	}
 
-	efs_proceed(&ctx->buffer, bytes_to_write);
-	ctx->current_stream_data.position += bytes_to_write;
-
-	if (ctx->current_stream_data.position < ctx->current_stream_data.datasize) {
-		return false;
-		// read more
+		efs_proceed(&ctx->buffer, bytes_to_write);
+		ctx->current_stream_data.position += bytes_to_write;
 	}
 
 	return true;
@@ -207,6 +207,8 @@ efs_parse_chunk(const void *p, const void *efs_p, size_t *len, efs_context *ctx)
 	if (!ctx->buffer.buffer) {
 		ctx->buffer.buffer = MALLOC(*len);
 		memcpy(ctx->buffer.buffer, p, *len);
+		ctx->buffer.length = *len;
+		ctx->buffer.position = 0;
 	}
 	else {
 		efs_append(&ctx->buffer, p, *len);
@@ -231,6 +233,7 @@ efs_parse_chunk(const void *p, const void *efs_p, size_t *len, efs_context *ctx)
 				return true;
 				// read more
 			}
+			break;
 		case STRM_HEADER_STATE:
 			next = read_stream_header(ctx);
 			if (next == NULL_STATE) {
@@ -243,6 +246,7 @@ efs_parse_chunk(const void *p, const void *efs_p, size_t *len, efs_context *ctx)
 			else {
 				ctx->parse_state = next;
 			}
+			break;
 		case STRM_NAME_STATE:
 			finish = read_stream_name(ctx);
 			if (finish) {
@@ -255,8 +259,9 @@ efs_parse_chunk(const void *p, const void *efs_p, size_t *len, efs_context *ctx)
 				return true;
 				// read more
 			}
+			break;
 		case STRM_DATA_HEADER_STATE:
-			finish = read_stream_data_header;
+			finish = read_stream_data_header(ctx);
 			if (finish) {
 				ctx->parse_state = STRM_DATA_VALUE_STATE;
 			}
@@ -267,6 +272,7 @@ efs_parse_chunk(const void *p, const void *efs_p, size_t *len, efs_context *ctx)
 				return true;
 				// read more
 			}
+			break;
 		case STRM_DATA_VALUE_STATE:
 			finish = read_stream_data_value(ctx, write_p, &write_byte);
 			if (finish) {

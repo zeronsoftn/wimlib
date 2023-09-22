@@ -982,7 +982,7 @@ unix_begin_extract_blob_instance(const struct blob_descriptor *blob,
 
 		ctx->efs_ctx[ctx->num_open_fds] = MALLOC(sizeof(efs_context));
 		memset(ctx->efs_ctx[ctx->num_open_fds], 0, sizeof(efs_context));
-		ctx->efs_ctx[ctx->num_open_fds]->parse_state = NULL_STATE;
+		ctx->efs_ctx[ctx->num_open_fds]->parse_state = ROOT_HEADER_STATE;
 
 		/* Collect encrypted directory entries for later process. */
 		if (dentry->d_inode->i_attributes & FILE_ATTRIBUTE_DIRECTORY) {
@@ -1240,7 +1240,7 @@ unix_end_extract_blob(struct blob_descriptor *blob, int status, void *_ctx)
 		efs_context temp;
 		list_for_each_entry(dentry, &ctx->efs_dirs, d_tmp_list) {
 			memset(&temp, 0, sizeof(efs_context));
-			temp.parse_state = NULL_STATE;
+			temp.parse_state = ROOT_HEADER_STATE;
 			temp.path = unix_build_extraction_path(dentry, ctx);
 			int ret;
 			ret = efs_parse_chunk(ctx->data_buffer, NULL, &blob->size, &temp);
