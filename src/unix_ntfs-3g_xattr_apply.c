@@ -1046,6 +1046,7 @@ unix_begin_extract_blob(struct blob_descriptor *blob, void *_ctx)
 	ctx->data_buffer_ptr = NULL;
 	ctx->any_sparse_files = false;
 	INIT_LIST_HEAD(&ctx->reparse_dentries);
+	INIT_LIST_HEAD(&ctx->efs_dirs);
 
 	for (u32 i = 0; i < blob->out_refcnt; i++) {
 		const struct wim_inode *inode = targets[i].inode;
