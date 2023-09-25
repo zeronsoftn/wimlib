@@ -11,6 +11,9 @@
 #define SIGNATURE_STREAM_NAME (utf16lechar[]){ 'N', 'T', 'F', 'S', '\0' }
 #define SIGNATURE_STREAM_DATA (utf16lechar[]){ 'G', 'U', 'R', 'E', '\0' }
 
+#define NAME_STREAM_NAME (u8[]){ 0x10, 0x19 }
+#define DATA_STREAM_NAME (u16[]){ ':', ':', '$', 'D', 'A', 'T', 'A' }
+
 
 /* ENCRYPTION HEADER in encrypted file. */
 typedef struct _EFS_HEADER {
@@ -117,9 +120,14 @@ typedef struct _efs_context {
 
 	int fd;
 	const char *path; // for writing efsinfo in encrypted directory
+	void *efsinfo_buf; // buffer for efsinfo xattr
+	size_t efsinfo_buf_size; // size for efsinfo buffer
+
 	u16 padding_size;
 
 	u32 write_offset; // writing offset for raw encrypted data
+
+	bool is_writing; // is data writing in progress?
 } efs_context;
 
 bool
