@@ -135,7 +135,7 @@ read_stream_data_header(efs_context *ctx) {
 	ctx->current_stream_data.position = 0;
 
 
-	if (!memcmp(ctx->current_stream_name.data, (u8[]){0x10, 0x19}, 2)) {
+	if (!memcmp(ctx->current_stream_name.data, NAME_STREAM_NAME, 2)) {
 		ctx->current_stream_data.datasize = ctx->current_stream_data.header.size - sizeof(EFS_STREAM_DATA_HEADER);
 		/*
 		 * This is a buffer of efsinfo. Set system.ntfs_efsinfo with file descriptor.
@@ -143,10 +143,13 @@ read_stream_data_header(efs_context *ctx) {
 		ctx->is_efs_info = true;
 		efs_proceed(&ctx->buffer, sizeof(ctx->current_stream_data.header));
 	}
-	else if (!memcmp(ctx->current_stream_name.data, (u16[]){ ':', ':', '$', 'D', 'A', 'T', 'A' }, 14)) {
+	else if (ctx->is_writing || !memcmp(ctx->current_stream_name.data, DATA_STREAM_NAME, 14)) {
 		if (efs_readable_size(&ctx->buffer) < sizeof(EFS_DATA_ENT)) {
 			return false;
 		}
+
+		if (!ctx->is_writing)
+			ctx->is_writing = true; // begin writing encrypted data
 
 		EFS_DATA_ENT *temp = (EFS_DATA_ENT *)efs_current(&ctx->buffer);
 		ctx->current_stream_data.datasize = ctx->current_stream_data.header.size - sizeof(*temp);
@@ -190,13 +193,13 @@ bool read_stream_data_value(efs_context *ctx, void *write_p, size_t *write_byte)
 			return false;
 			// read more
 		}
-		int ret = ctx->fd > 0 ? 
-			fsetxattr(ctx->fd, "system.ntfs_efsinfo", efs_current(&ctx->buffer), bytes_to_write, 0) : 
-			lsetxattr(ctx->path, "system.ntfs_efsinfo", efs_current(&ctx->buffer), bytes_to_write, 0);
-		if (ret) {
-			ctx->err_flag = true;
-			return false;
-		}
+		/*
+		 * efsinfo should be set after the file is fully written(there a flaw in ntfs-3g driver?)
+		 */
+		ctx->efsinfo_buf = MALLOC(ctx->current_stream_data.datasize);
+		memcpy(ctx->efsinfo_buf, efs_current(&ctx->buffer), bytes_to_write);
+		ctx->efsinfo_buf_size = bytes_to_write;
+
 		ctx->is_efs_info = false;
 
 		efs_proceed(&ctx->buffer, bytes_to_write);
@@ -286,17 +289,12 @@ efs_parse_chunk(const void *p, const void *efs_p, size_t *len, efs_context *ctx)
 				return false;
 			}
 			else {
-				return true;
-				// read more
+				break;
 			}
 		}
 	}
 
-	FREE(ctx->buffer.buffer);
-
-	if (write_byte < *len && efs_p) {
-		*len = write_byte;
-	}
+	*len = write_byte; // set length of currently written data
 
 	return true;
 }

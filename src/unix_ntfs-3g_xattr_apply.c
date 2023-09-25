@@ -984,7 +984,7 @@ unix_begin_extract_blob_instance(const struct blob_descriptor *blob,
 		memset(ctx->efs_ctx[ctx->num_open_fds], 0, sizeof(efs_context));
 		ctx->efs_ctx[ctx->num_open_fds]->parse_state = ROOT_HEADER_STATE;
 
-		/* Collect encrypted directory entries for later process. */
+		/* Collect encrypted directory entries for later. */
 		if (dentry->d_inode->i_attributes & FILE_ATTRIBUTE_DIRECTORY) {
 			if (!prepare_data_buffer(ctx, blob->size))
 				return WIMLIB_ERR_NOMEM;
@@ -1019,9 +1019,8 @@ retry_create:
 		ctx->any_sparse_files = true;
 	} else {
 		ctx->is_sparse_file[ctx->num_open_fds] = false;
-#ifdef HAVE_POSIX_FALLOCATE
-		posix_fallocate(fd, 0, blob->size);
-#endif
+	if (!ctx->efs_ctx[ctx->num_open_fds])
+		ftruncate(fd, blob->size);
 	}
 	if (ctx->efs_ctx[ctx->num_open_fds]) {
 		ctx->efs_ctx[ctx->num_open_fds]->fd = fd;
@@ -1143,7 +1142,7 @@ static int
 unix_end_extract_blob(struct blob_descriptor *blob, int status, void *_ctx)
 {
 	struct unix_ntfs_3g_xattr_apply_ctx *ctx = _ctx;
-	int ret;
+	int ret = 0;
 	const char *path;
 	const struct blob_extraction_target *targets = blob_extraction_targets(blob);
 	const struct wim_dentry *dentry;
@@ -1171,20 +1170,41 @@ unix_end_extract_blob(struct blob_descriptor *blob, int status, void *_ctx)
 		 * Truncate encrypted file size to its actual size.
 		 */
 		if (ctx->efs_ctx[i] && ctx->efs_ctx[i]->fd) {
-			ret = full_pwrite(fd, &ctx->efs_ctx[i]->padding_size,
-						2, ctx->efs_ctx[i]->write_offset);
-			ctx->efs_ctx[i]->write_offset += 2;
+			if (ctx->efs_ctx[i]->write_offset) {
+				ret = full_pwrite(fd, &ctx->efs_ctx[i]->padding_size,
+							2, ctx->efs_ctx[i]->write_offset);
+				ctx->efs_ctx[i]->write_offset += 2;
+			}
 			ftruncate(fd->fd, ctx->efs_ctx[i]->write_offset);
-
-			FREE(ctx->efs_ctx[i]);
-			ctx->efs_ctx[i] = NULL;
 
 			if (ret) {
 				ERROR_WITH_ERRNO("Failed to write efs padding size of \"%s\"!",
 						unix_build_inode_extraction_path(inode, ctx));
+				ret = WIMLIB_ERR_WRITE;
+				break;
 			}
-			ret = WIMLIB_ERR_WRITE;
-			break;
+
+			ret = ctx->efs_ctx[i]->fd > 0 ?
+				fsetxattr(ctx->efs_ctx[i]->fd, "system.ntfs_efsinfo",
+							ctx->efs_ctx[i]->efsinfo_buf,
+							ctx->efs_ctx[i]->efsinfo_buf_size,
+							0) : 
+				lsetxattr(ctx->efs_ctx[i]->path,
+							"system.ntfs_efsinfo",
+							ctx->efs_ctx[i]->efsinfo_buf,
+							ctx->efs_ctx[i]->efsinfo_buf_size,
+							0);
+
+			if (ret) {
+				ERROR_WITH_ERRNO("Failed to set efsinfo for \"%s\"!",
+						unix_build_inode_extraction_path(inode, ctx));
+				ret = WIMLIB_ERR_SET_XATTR;
+				break;
+			}
+
+			FREE(ctx->efs_ctx[i]->buffer.buffer);
+			FREE(ctx->efs_ctx[i]);
+			ctx->efs_ctx[i] = NULL;
 		}
 
 		/* Set metadata on regular file just before closing.  */
@@ -1244,6 +1264,24 @@ unix_end_extract_blob(struct blob_descriptor *blob, int status, void *_ctx)
 			temp.path = unix_build_extraction_path(dentry, ctx);
 			int ret;
 			ret = efs_parse_chunk(ctx->data_buffer, NULL, &blob->size, &temp);
+
+		ret = temp.fd > 0 ?
+			fsetxattr(temp.fd, "system.ntfs_efsinfo",
+						temp.efsinfo_buf,
+						temp.efsinfo_buf_size,
+						0) : 
+			lsetxattr(temp.path,
+						"system.ntfs_efsinfo",
+						temp.efsinfo_buf,
+						temp.efsinfo_buf_size,
+						0);
+
+			FREE(temp.buffer.buffer);
+
+			if (ret) {
+				ERROR("Failed to write efsinfo for \"%s\"", temp.path);
+				return WIMLIB_ERR_WRITE;
+			}
 		}
 	}
 
