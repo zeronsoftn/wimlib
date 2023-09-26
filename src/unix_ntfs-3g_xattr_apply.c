@@ -782,8 +782,9 @@ unix_create_if_directory(const struct wim_dentry *dentry,
 	return report_file_created(&ctx->common);
 }
 
-/* If @dentry represents an empty regular file or a special file, create it, set
- * its metadata, and create any needed hard links.  */
+/* If @dentry represents an empty regular file or encrypted file 
+ * or a special file, create it, set its metadata, and create any needed hard links.
+ */
 static int
 unix_extract_if_empty_file(const struct wim_dentry *dentry,
 			   struct unix_ntfs_3g_xattr_apply_ctx *ctx)
@@ -1007,7 +1008,11 @@ unix_begin_extract_blob_instance(const struct blob_descriptor *blob,
 
 	path = unix_build_extraction_path(dentry, ctx);
 retry_create:
-	fd = open(path, O_EXCL | O_CREAT | O_WRONLY | O_NOFOLLOW, 0644);
+	/* As encrypted files with hardlink is created before,
+	 * we need to write into the files created in advance.*/
+	fd = stream_is_encrypted_stream(strm) ? 
+		open(path, O_CREAT | O_WRONLY | O_NOFOLLOW, 0644) : 
+		open(path, O_EXCL | O_CREAT | O_WRONLY | O_NOFOLLOW, 0644);
 	if (fd < 0) {
 		if (errno == EEXIST && !unlink(path))
 			goto retry_create;
