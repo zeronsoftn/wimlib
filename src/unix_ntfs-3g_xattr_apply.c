@@ -803,7 +803,8 @@ unix_extract_if_empty_file(const struct wim_dentry *dentry,
 	/* Is this a directory, a symbolic link, or any type of nonempty file?
 	 */
 	if (should_extract_as_directory(inode) || inode_is_symlink(inode) ||
-	    inode_get_blob_for_unnamed_data_stream_resolved(inode))
+	    inode_get_blob_for_unnamed_data_stream_resolved(inode) ||
+		inode_get_efsrpc_stream_resolved(inode))
 		return 0;
 
 	/* Recognize special files in UNIX_DATA mode  */
@@ -1010,7 +1011,7 @@ unix_begin_extract_blob_instance(const struct blob_descriptor *blob,
 retry_create:
 	/* As encrypted files with hardlink is created before,
 	 * we need to write into the files created in advance.*/
-	fd = stream_is_encrypted_stream(strm) ? 
+	fd = stream_is_efsrpc_raw_stream(strm) ? 
 		open(path, O_CREAT | O_WRONLY | O_NOFOLLOW, 0644) : 
 		open(path, O_EXCL | O_CREAT | O_WRONLY | O_NOFOLLOW, 0644);
 	if (fd < 0) {
@@ -1035,7 +1036,7 @@ retry_create:
 	/* Set DOS name of file if exists */
 	unix_set_dos_name(dentry, path);
 
-	return 0;
+	return unix_create_hardlinks(dentry->d_inode, dentry, path, ctx);
 }
 
 /* Called when starting to read a blob for extraction  */

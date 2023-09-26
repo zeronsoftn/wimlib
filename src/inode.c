@@ -199,6 +199,21 @@ inode_get_unnamed_stream(const struct wim_inode *inode, int stream_type)
 	return NULL;
 }
 
+/*
+ * Get EFSRPC_RAW_DATA stream from inode.
+ */
+struct wim_inode_stream *
+inode_get_efsrpc_raw_stream(const struct wim_inode *inode)
+{
+	for (unsigned i = 0; i < inode->i_num_streams; i++) {
+		struct wim_inode_stream *strm = &inode->i_streams[i];
+		if (strm->stream_type == STREAM_TYPE_EFSRPC_RAW_DATA)
+		{
+			return strm;
+		}
+	}
+	return NULL;
+}
 
 static void
 inode_set_stream_blob(struct wim_inode *inode, struct wim_inode_stream *strm,
@@ -558,6 +573,20 @@ inode_get_blob_for_unnamed_data_stream_resolved(const struct wim_inode *inode)
 	const struct wim_inode_stream *strm;
 
 	strm = inode_get_unnamed_data_stream(inode);
+	if (!strm)
+		return NULL;
+
+	return stream_blob_resolved(strm);
+}
+
+/* Return the blob descriptor for the encrypted stream of inode, or NULL
+ * if not exists. */
+struct blob_descriptor *
+inode_get_efsrpc_stream_resolved(const struct wim_inode *inode)
+{
+	const struct wim_inode_stream *strm;
+
+	strm = inode_get_efsrpc_raw_stream(inode);
 	if (!strm)
 		return NULL;
 
