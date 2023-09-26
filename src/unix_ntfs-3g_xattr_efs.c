@@ -194,7 +194,7 @@ bool read_stream_data_value(efs_context *ctx, void *write_p, size_t *write_byte)
 			// read more
 		}
 		/*
-		 * efsinfo should be set after the file is fully written(there a flaw in ntfs-3g driver?)
+		 * efsinfo should be set after the file is fully written with padding size(otherwise file is broken)
 		 */
 		ctx->efsinfo_buf = MALLOC(ctx->current_stream_data.datasize);
 		memcpy(ctx->efsinfo_buf, efs_current(&ctx->buffer), bytes_to_write);

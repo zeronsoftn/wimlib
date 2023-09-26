@@ -1202,6 +1202,7 @@ unix_end_extract_blob(struct blob_descriptor *blob, int status, void *_ctx)
 				break;
 			}
 
+			FREE(ctx->efs_ctx[i]->efsinfo_buf);
 			FREE(ctx->efs_ctx[i]->buffer.buffer);
 			FREE(ctx->efs_ctx[i]);
 			ctx->efs_ctx[i] = NULL;
@@ -1276,6 +1277,7 @@ unix_end_extract_blob(struct blob_descriptor *blob, int status, void *_ctx)
 						temp.efsinfo_buf_size,
 						0);
 
+			FREE(temp.efsinfo_buf);
 			FREE(temp.buffer.buffer);
 
 			if (ret) {
