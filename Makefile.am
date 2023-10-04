@@ -152,7 +152,6 @@ libwim_la_SOURCES =		\
 	include/wimlib/types.h		\
 	include/wimlib/unaligned.h	\
 	include/wimlib/unix_data.h	\
-	include/wimlib/unix_ntfs_3g_xattr.h \
 	include/wimlib/util.h		\
 	include/wimlib/wim.h		\
 	include/wimlib/write.h		\
@@ -183,10 +182,10 @@ libwim_la_SOURCES += src/wimboot.c			\
 PLATFORM_LIBS = -lntdll
 else
 libwim_la_SOURCES += src/unix_apply.c		\
-			 src/unix_ntfs-3g_xattr_apply.c		\
-		     src/unix_capture.c				\
-			 src/unix_ntfs-3g_xattr_efs.c 			\
-			 include/wimlib/unix_ntfs-3g_xattr_efs.h
+			 src/unix_ntfs-3g_mounted_apply.c		\
+			 src/unix_capture.c				\
+			 src/unix_ntfs-3g_mounted_efs.c 			\
+			 include/wimlib/unix_ntfs-3g_mounted_efs.h
 
 PLATFORM_LIBS =
 endif
