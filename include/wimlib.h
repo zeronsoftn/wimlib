@@ -2127,8 +2127,6 @@ typedef int (*wimlib_iterate_lookup_table_callback_t)(const struct wimlib_resour
 /** Support UNIX owners, groups, modes, and special files.  */
 #define WIMLIB_MOUNT_FLAG_UNIX_DATA			0x00000020
 
-/** Support ntfs-3g extended attributes for setting ntfs specific data from, */
-
 /** Allow other users to see the mounted filesystem.  This passes the @c
  * allow_other option to fuse_main().  */
 #define WIMLIB_MOUNT_FLAG_ALLOW_OTHER			0x00000040
