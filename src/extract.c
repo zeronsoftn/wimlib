@@ -1472,7 +1472,7 @@ select_apply_operations(int extract_flags)
 	return &win32_apply_ops;
 #else
 	if (extract_flags & WIMLIB_EXTRACT_FLAG_UNIX_NTFS_3G_MOUNTED) {
-		return &unix_ntfs_3g_xattr_apply_ops;
+		return &unix_ntfs_3g_mounted_apply_ops;
 	}
 	return &unix_apply_ops;
 #endif
