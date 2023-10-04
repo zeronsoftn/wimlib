@@ -92,7 +92,7 @@ unix_ntfs_3g_mounted_get_supported_features(const char *target,
 
 #define NUM_PATHBUFS 2  /* We need 2 when creating hard links  */
 
-struct unix_ntfs_3g_xattr_apply_ctx {
+struct unix_ntfs_3g_mounted_ctx {
 	/* Extract flags, the pointer to the WIMStruct, etc.  */
 	struct apply_ctx common;
 
@@ -181,7 +181,7 @@ unix_dentry_path_length(const struct wim_dentry *dentry)
  * path to the target directory itself.  */
 static size_t
 unix_compute_path_max(const struct list_head *dentry_list,
-		      const struct unix_ntfs_3g_xattr_apply_ctx *ctx)
+		      const struct unix_ntfs_3g_mounted_ctx *ctx)
 {
 	size_t max = 0;
 	size_t len;
@@ -201,7 +201,7 @@ unix_compute_path_max(const struct list_head *dentry_list,
  * This cycles through NUM_PATHBUFS different buffers.  */
 static const char *
 unix_build_extraction_path(const struct wim_dentry *dentry,
-			   struct unix_ntfs_3g_xattr_apply_ctx *ctx)
+			   struct unix_ntfs_3g_mounted_ctx *ctx)
 {
 	char *pathbuf;
 	char *p;
@@ -231,7 +231,7 @@ unix_build_extraction_path(const struct wim_dentry *dentry,
 /* This causes the next call to unix_build_extraction_path() to use the same
  * path buffer as the previous call.  */
 static void
-unix_reuse_pathbuf(struct unix_ntfs_3g_xattr_apply_ctx *ctx)
+unix_reuse_pathbuf(struct unix_ntfs_3g_mounted_ctx *ctx)
 {
 	ctx->which_pathbuf = (ctx->which_pathbuf - 1) % NUM_PATHBUFS;
 }
@@ -240,7 +240,7 @@ unix_reuse_pathbuf(struct unix_ntfs_3g_xattr_apply_ctx *ctx)
  * alias of the @inode.  This cycles through NUM_PATHBUFS different buffers.  */
 static const char *
 unix_build_inode_extraction_path(const struct wim_inode *inode,
-				 struct unix_ntfs_3g_xattr_apply_ctx *ctx)
+				 struct unix_ntfs_3g_mounted_ctx *ctx)
 {
 	return unix_build_extraction_path(inode_first_extraction_dentry(inode), ctx);
 }
@@ -319,7 +319,7 @@ unix_set_mode(int fd, const char *path, mode_t mode)
 /* Apply extended attributes to a file */
 static int
 apply_linux_xattrs(int fd, const struct wim_inode *inode,
-		   const char *path, struct unix_ntfs_3g_xattr_apply_ctx *ctx,
+		   const char *path, struct unix_ntfs_3g_mounted_ctx *ctx,
 		   const void *entries, size_t entries_size, bool is_old_format)
 {
 	const void * const entries_end = entries + entries_size;
@@ -411,7 +411,7 @@ apply_linux_xattrs(int fd, const struct wim_inode *inode,
  */
 static int
 apply_unix_metadata(int fd, const struct wim_inode *inode,
-		    const char *path, struct unix_ntfs_3g_xattr_apply_ctx *ctx)
+		    const char *path, struct unix_ntfs_3g_mounted_ctx *ctx)
 {
 	bool have_dat;
 	struct wimlib_unix_data dat;
@@ -475,7 +475,7 @@ apply_unix_metadata(int fd, const struct wim_inode *inode,
 static int
 unix_set_ntfs_xattr(int fd, const struct wim_inode *inode,
 		  const char *path, 
-		  struct unix_ntfs_3g_xattr_apply_ctx *ctx)
+		  struct unix_ntfs_3g_mounted_ctx *ctx)
 {	
 	const void *entries, *entries_end;
 	u32 len;
@@ -589,7 +589,7 @@ unix_set_dos_name(const struct wim_dentry *dentry,
  */
 static int
 unix_set_metadata(int fd, const struct wim_inode *inode,
-		  const char *path, struct unix_ntfs_3g_xattr_apply_ctx *ctx)
+		  const char *path, struct unix_ntfs_3g_mounted_ctx *ctx)
 {
 	int ret;
 
@@ -684,7 +684,7 @@ unix_set_metadata(int fd, const struct wim_inode *inode,
 static int
 unix_create_hardlinks(const struct wim_inode *inode,
 		      const struct wim_dentry *first_dentry,
-		      const char *first_path, struct unix_ntfs_3g_xattr_apply_ctx *ctx)
+		      const char *first_path, struct unix_ntfs_3g_mounted_ctx *ctx)
 {
 	const struct wim_dentry *dentry;
 	const char *newpath;
@@ -711,7 +711,7 @@ unix_create_hardlinks(const struct wim_inode *inode,
 	as ntfs-3g needs a file entry to set extended attribute. */
 static int
 unix_prepare_reparse_points(const struct wim_dentry *dentry,
-			 struct unix_ntfs_3g_xattr_apply_ctx *ctx)
+			 struct unix_ntfs_3g_mounted_ctx *ctx)
 {
 	const char *path;
 	struct stat stbuf;
@@ -757,7 +757,7 @@ retry_create:
 /* If @dentry represents a directory, create it.  */
 static int
 unix_create_if_directory(const struct wim_dentry *dentry,
-			 struct unix_ntfs_3g_xattr_apply_ctx *ctx)
+			 struct unix_ntfs_3g_mounted_ctx *ctx)
 {
 	const char *path;
 	struct stat stbuf;
@@ -787,7 +787,7 @@ unix_create_if_directory(const struct wim_dentry *dentry,
  */
 static int
 unix_extract_if_empty_file(const struct wim_dentry *dentry,
-			   struct unix_ntfs_3g_xattr_apply_ctx *ctx)
+			   struct unix_ntfs_3g_mounted_ctx *ctx)
 {
 	const struct wim_inode *inode;
 	struct wimlib_unix_data unix_data;
@@ -864,7 +864,7 @@ unix_extract_if_empty_file(const struct wim_dentry *dentry,
 
 static int
 unix_create_dirs_and_empty_files(const struct list_head *dentry_list,
-				 struct unix_ntfs_3g_xattr_apply_ctx *ctx)
+				 struct unix_ntfs_3g_mounted_ctx *ctx)
 {
 	const struct wim_dentry *dentry;
 	int ret;
@@ -917,7 +917,7 @@ static int
 unix_set_reparse_data(const struct wim_dentry *dentry,
 	const struct reparse_buffer_disk *rpbuf,
 	u16 rpbuflen,
-	struct unix_ntfs_3g_xattr_apply_ctx *ctx)
+	struct unix_ntfs_3g_mounted_ctx *ctx)
 {
 	int ret;
 	const char *path;
@@ -937,7 +937,7 @@ unix_set_reparse_data(const struct wim_dentry *dentry,
 }
 
 static void
-unix_cleanup_open_fds(struct unix_ntfs_3g_xattr_apply_ctx *ctx, unsigned offset)
+unix_cleanup_open_fds(struct unix_ntfs_3g_mounted_ctx *ctx, unsigned offset)
 {
 	for (unsigned i = offset; i < ctx->num_open_fds; i++)
 		filedes_close(&ctx->open_fds[i]);
@@ -948,7 +948,7 @@ unix_cleanup_open_fds(struct unix_ntfs_3g_xattr_apply_ctx *ctx, unsigned offset)
 /* Prepare to read the next blob, which has size @blob_size, into an in-memory
  * buffer.  */
 static bool
-prepare_data_buffer(struct unix_ntfs_3g_xattr_apply_ctx *ctx, u64 blob_size)
+prepare_data_buffer(struct unix_ntfs_3g_mounted_ctx *ctx, u64 blob_size)
 {
 	if (blob_size > ctx->data_buffer_size) {
 		/* Larger buffer needed.  */
@@ -972,7 +972,7 @@ static int
 unix_begin_extract_blob_instance(const struct blob_descriptor *blob,
 				 struct wim_dentry *dentry,
 				 const struct wim_inode_stream *strm,
-				 struct unix_ntfs_3g_xattr_apply_ctx *ctx)
+				 struct unix_ntfs_3g_mounted_ctx *ctx)
 {
 	int fd;
 	int ret;
@@ -1044,7 +1044,7 @@ retry_create:
 static int
 unix_begin_extract_blob(struct blob_descriptor *blob, void *_ctx)
 {
-	struct unix_ntfs_3g_xattr_apply_ctx *ctx = _ctx;
+	struct unix_ntfs_3g_mounted_ctx *ctx = _ctx;
 	const struct blob_extraction_target *targets = blob_extraction_targets(blob);
 	int ret;
 
@@ -1073,7 +1073,7 @@ static int
 unix_extract_chunk(const struct blob_descriptor *blob, u64 offset,
 		   const void *chunk, size_t size, void *_ctx)
 {
-	struct unix_ntfs_3g_xattr_apply_ctx *ctx = _ctx;
+	struct unix_ntfs_3g_mounted_ctx *ctx = _ctx;
 	const void *end = chunk + size;
 	const void *p;
 	bool zeroes;
@@ -1150,7 +1150,7 @@ err:
 static int
 unix_end_extract_blob(struct blob_descriptor *blob, int status, void *_ctx)
 {
-	struct unix_ntfs_3g_xattr_apply_ctx *ctx = _ctx;
+	struct unix_ntfs_3g_mounted_ctx *ctx = _ctx;
 	int ret = 0;
 	const char *path;
 	const struct blob_extraction_target *targets = blob_extraction_targets(blob);
@@ -1300,7 +1300,7 @@ unix_end_extract_blob(struct blob_descriptor *blob, int status, void *_ctx)
 }
 
 static int
-unix_set_dir_metadata(struct list_head *dentry_list, struct unix_ntfs_3g_xattr_apply_ctx *ctx)
+unix_set_dir_metadata(struct list_head *dentry_list, struct unix_ntfs_3g_mounted_ctx *ctx)
 {
 	const struct wim_dentry *dentry;
 	int ret;
@@ -1322,7 +1322,7 @@ static int
 unix_ntfs_3g_mounted_extract(struct list_head *dentry_list, struct apply_ctx *_ctx)
 {
 	int ret;
-	struct unix_ntfs_3g_xattr_apply_ctx *ctx = (struct unix_ntfs_3g_xattr_apply_ctx *)_ctx;
+	struct unix_ntfs_3g_mounted_ctx *ctx = (struct unix_ntfs_3g_mounted_ctx *)_ctx;
 	size_t path_max;
 	u64 dir_count;
 	u64 empty_file_count;
@@ -1420,5 +1420,5 @@ const struct apply_operations unix_ntfs_3g_xattr_apply_ops = {
 	.name			= "UNIX_NTFS_3G_MOUNTED",
 	.get_supported_features = unix_ntfs_3g_mounted_get_supported_features,
 	.extract                = unix_ntfs_3g_mounted_extract,
-	.context_size           = sizeof(struct unix_ntfs_3g_xattr_apply_ctx),
+	.context_size           = sizeof(struct unix_ntfs_3g_mounted_ctx),
 };
