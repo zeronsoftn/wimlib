@@ -1009,11 +1009,7 @@ unix_begin_extract_blob_instance(const struct blob_descriptor *blob,
 
 	path = unix_build_extraction_path(dentry, ctx);
 retry_create:
-	/* As encrypted files with hardlink is created before,
-	 * we need to write into the files created in advance.*/
-	fd = stream_is_efsrpc_raw_stream(strm) ? 
-		open(path, O_CREAT | O_WRONLY | O_NOFOLLOW, 0644) : 
-		open(path, O_EXCL | O_CREAT | O_WRONLY | O_NOFOLLOW, 0644);
+	fd = open(path, O_EXCL | O_CREAT | O_WRONLY | O_NOFOLLOW, 0644);
 	if (fd < 0) {
 		if (errno == EEXIST && !unlink(path))
 			goto retry_create;
@@ -1100,7 +1096,7 @@ unix_extract_chunk(const struct blob_descriptor *blob, u64 offset,
 		zeroes = maybe_detect_sparse_region(p, end - p, &len,
 						    ctx->any_sparse_files);
 		/*
-		 * Parse EFSRPC data to read and write encrypted data.
+		 * For encrypted files, parse EFSRPC data to read and write encrypted data.
 		 */
 		for (i = 0; i < ctx->num_open_fds; i++) {
 			if (ctx->efs_ctx[i]) {
