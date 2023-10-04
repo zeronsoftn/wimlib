@@ -93,7 +93,7 @@
 	 WIMLIB_EXTRACT_FLAG_COMPACT_XPRESS8K		|	\
 	 WIMLIB_EXTRACT_FLAG_COMPACT_XPRESS16K		|	\
 	 WIMLIB_EXTRACT_FLAG_COMPACT_LZX			|	\
-	 WIMLIB_EXTRACT_FLAG_UNIX_NTFS_3G_XATTR	\
+	 WIMLIB_EXTRACT_FLAG_UNIX_NTFS_3G_MOUNTED	\
 	 )
 
 /* Send WIMLIB_PROGRESS_MSG_EXTRACT_FILE_STRUCTURE or
@@ -1471,7 +1471,7 @@ select_apply_operations(int extract_flags)
 #ifdef _WIN32
 	return &win32_apply_ops;
 #else
-	if (extract_flags & WIMLIB_EXTRACT_FLAG_UNIX_NTFS_3G_XATTR) {
+	if (extract_flags & WIMLIB_EXTRACT_FLAG_UNIX_NTFS_3G_MOUNTED) {
 		return &unix_ntfs_3g_xattr_apply_ops;
 	}
 	return &unix_apply_ops;
