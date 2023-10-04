@@ -172,12 +172,13 @@ read_stream_data_header(efs_context *ctx) {
 }
 
 static
-bool read_stream_data_value(efs_context *ctx, void *write_p, size_t *write_byte) {
+bool read_stream_data_value(efs_context *ctx, void **write_p, size_t *write_byte) {
+
 	size_t bytes_to_write = min(efs_readable_size(&ctx->buffer), 
 		ctx->current_stream_data.datasize - ctx->current_stream_data.position);
 
 	if (!ctx->is_efs_info) {
-		write_p = write_p ? mempcpy(write_p, efs_current(&ctx->buffer), bytes_to_write) : NULL;
+		*write_p = *write_p ? mempcpy(*write_p, efs_current(&ctx->buffer), bytes_to_write) : NULL;
 		*write_byte += bytes_to_write;
 		efs_proceed(&ctx->buffer, bytes_to_write);
 		ctx->current_stream_data.position += bytes_to_write;
@@ -211,6 +212,7 @@ bool read_stream_data_value(efs_context *ctx, void *write_p, size_t *write_byte)
 
 bool
 efs_parse_chunk(const void *p, const void *efs_p, size_t *len, efs_context *ctx) {
+
 	if (!ctx->buffer.buffer) {
 		ctx->buffer.buffer = MALLOC(*len);
 		memcpy(ctx->buffer.buffer, p, *len);
@@ -237,6 +239,8 @@ efs_parse_chunk(const void *p, const void *efs_p, size_t *len, efs_context *ctx)
 				return false;
 			}
 			else {
+				if (write_byte)
+					goto WRITE_DATA;
 				return true;
 				// read more
 			}
@@ -244,6 +248,8 @@ efs_parse_chunk(const void *p, const void *efs_p, size_t *len, efs_context *ctx)
 		case STRM_HEADER_STATE:
 			next = read_stream_header(ctx);
 			if (next == NULL_STATE) {
+				if (write_byte)
+					goto WRITE_DATA;
 				return true;
 				// read more
 			}
@@ -263,6 +269,8 @@ efs_parse_chunk(const void *p, const void *efs_p, size_t *len, efs_context *ctx)
 				return false;
 			}
 			else {
+				if (write_byte)
+					goto WRITE_DATA;
 				return true;
 				// read more
 			}
@@ -276,12 +284,14 @@ efs_parse_chunk(const void *p, const void *efs_p, size_t *len, efs_context *ctx)
 				return false;
 			}
 			else {
+				if (write_byte)
+					goto WRITE_DATA;
 				return true;
 				// read more
 			}
 			break;
 		case STRM_DATA_VALUE_STATE:
-			finish = read_stream_data_value(ctx, write_p, &write_byte);
+			finish = read_stream_data_value(ctx, &write_p, &write_byte);
 			if (finish) {
 				ctx->parse_state = STRM_HEADER_STATE;
 			}
@@ -289,11 +299,13 @@ efs_parse_chunk(const void *p, const void *efs_p, size_t *len, efs_context *ctx)
 				return false;
 			}
 			else {
+				if (write_byte)
+					goto WRITE_DATA;
 				break;
 			}
 		}
 	}
-
+WRITE_DATA:
 	*len = write_byte; // set length of currently written data
 
 	return true;
