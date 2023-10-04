@@ -689,7 +689,7 @@ append_image_property_argument(struct string_list *image_properties)
 
 static int
 apply_image_properties(struct string_list *image_properties,
-			   WIMStruct *wim, int image, bool *any_changes_ret)
+		       WIMStruct *wim, int image, bool *any_changes_ret)
 {
 	bool any_changes = false;
 	for (unsigned i = 0; i < image_properties->num_strings; i++) {
@@ -744,7 +744,7 @@ do_resource_not_found_warning(const tchar *wimfile,
 
 static void
 do_metadata_not_found_warning(const tchar *wimfile,
-				  const struct wimlib_wim_info *info)
+			      const struct wimlib_wim_info *info)
 {
 	if (info->part_number != 1) {
 		imagex_error(T("\"%"TS"\" is not the first part of the split WIM.\n"
@@ -1181,8 +1181,8 @@ imagex_progress_func(enum wimlib_progress_msg msg,
 			percent_done = TO_PERCENT(info->extract.current_file_count,
 						  info->extract.end_file_count);
 			imagex_printf(T("\rCreating files: %"PRIu64" of %"PRIu64" (%u%%) done"),
-					  info->extract.current_file_count,
-					  info->extract.end_file_count, percent_done);
+				      info->extract.current_file_count,
+				      info->extract.end_file_count, percent_done);
 			if (info->extract.current_file_count == info->extract.end_file_count)
 				imagex_printf(T("\n"));
 		}
@@ -4288,7 +4288,7 @@ imagex_verify(int argc, tchar **argv, int cmd)
 		imagex_error(T("\"%"TS"\" failed verification!"),
 			     wimfile);
 		if (ret == WIMLIB_ERR_RESOURCE_NOT_FOUND &&
-			refglobs.num_strings == 0)
+		    refglobs.num_strings == 0)
 		{
 			imagex_printf(T("Note: if this WIM file is not standalone, "
 					"use the --ref option to specify the other parts.\n"));
