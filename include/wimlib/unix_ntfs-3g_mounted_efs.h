@@ -130,5 +130,5 @@ typedef struct _efs_context {
 	bool is_writing; // is data writing in progress?
 } efs_context;
 
-bool
+int
 efs_parse_chunk(const void *p, const void *efs_p, size_t *len, efs_context *cxt);

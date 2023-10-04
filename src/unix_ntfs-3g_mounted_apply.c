@@ -50,8 +50,8 @@
 #include "wimlib/scan.h"
 #include "wimlib/timestamp.h"
 #include "wimlib/unix_data.h"
-#include "wimlib/unix_ntfs-3g_xattr.h"
-#include "wimlib/unix_ntfs-3g_xattr_efs.h"
+#include "wimlib/unix_ntfs-3g_mounted.h"
+#include "wimlib/unix_ntfs-3g_mounted_efs.h"
 #include "wimlib/xattr.h"
 
 /* We don't require O_NOFOLLOW, but the advantage of having it is that if we
@@ -64,7 +64,7 @@
 #endif
 
 static int
-unix_with_attr_get_supported_features(const char *target,
+unix_ntfs_3g_mounted_get_supported_features(const char *target,
 			    struct wim_features *supported_features)
 {
 	supported_features->readonly_files            = 1;
@@ -616,7 +616,7 @@ unix_set_metadata(int fd, const struct wim_inode *inode,
 		WARNING_WITH_ERRNO("\"%s\": unable to set timestamps", path);
 	}
 
-	//* set ntfs file attribute with ntfs-3g attribute - only directory attributes are handled
+	//* set ntfs file attribute with ntfs-3g attribute - only directory attributes are handled for compression
 	ret =  fd > 0 ? fsetxattr(fd, "system.ntfs_attrib", &inode->i_attributes, sizeof(inode->i_attributes), 0) : 
 	lsetxattr(path, "system.ntfs_attrib", &inode->i_attributes, sizeof(inode->i_attributes), 0);
 	if (ret) {
@@ -928,6 +928,11 @@ unix_set_reparse_data(const struct wim_dentry *dentry,
 		ERROR_WITH_ERRNO("Failed to create reparse point for \"%s\"", path);
 	}
 
+	ret = unix_set_metadata(0, dentry->d_inode, path, ctx);
+	if (ret) {
+		ERROR_WITH_ERRNO("Failed to set metadatas for reparse point for \"%s\"", path);
+	}
+
 	return ret;
 }
 
@@ -1075,8 +1080,6 @@ unix_extract_chunk(const struct blob_descriptor *blob, u64 offset,
 	size_t len;
 	unsigned i;
 	int ret;
-
-	bool parse_ret;
 	size_t efs_len = 0; //* The size of a byte to write for efs file
 
 	/* 
@@ -1101,9 +1104,13 @@ unix_extract_chunk(const struct blob_descriptor *blob, u64 offset,
 		for (i = 0; i < ctx->num_open_fds; i++) {
 			if (ctx->efs_ctx[i]) {
 				void *efs_p = MALLOC(len);
+				if (!efs_p) {
+					ret = WIMLIB_ERR_NOMEM;
+					goto err;
+				}
 				efs_len = len;
-				parse_ret = efs_parse_chunk(p, efs_p, &efs_len, ctx->efs_ctx[i]);
-				if (!parse_ret) {
+				ret = efs_parse_chunk(p, efs_p, &efs_len, ctx->efs_ctx[i]);
+				if (ret) {
 					goto err;
 				}
 				ret =full_pwrite(&ctx->open_fds[i],
@@ -1312,7 +1319,7 @@ unix_set_dir_metadata(struct list_head *dentry_list, struct unix_ntfs_3g_xattr_a
 }
 
 static int
-unix_ntfs_3g_xattr_extract(struct list_head *dentry_list, struct apply_ctx *_ctx)
+unix_ntfs_3g_mounted_extract(struct list_head *dentry_list, struct apply_ctx *_ctx)
 {
 	int ret;
 	struct unix_ntfs_3g_xattr_apply_ctx *ctx = (struct unix_ntfs_3g_xattr_apply_ctx *)_ctx;
@@ -1410,8 +1417,8 @@ out:
 }
 
 const struct apply_operations unix_ntfs_3g_xattr_apply_ops = {
-	.name			= "UNIX_NTFS_3G_XATTR",
-	.get_supported_features = unix_with_attr_get_supported_features,
-	.extract                = unix_ntfs_3g_xattr_extract,
+	.name			= "UNIX_NTFS_3G_MOUNTED",
+	.get_supported_features = unix_ntfs_3g_mounted_get_supported_features,
+	.extract                = unix_ntfs_3g_mounted_extract,
 	.context_size           = sizeof(struct unix_ntfs_3g_xattr_apply_ctx),
 };

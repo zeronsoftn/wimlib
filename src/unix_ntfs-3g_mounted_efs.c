@@ -1,4 +1,4 @@
-#include "wimlib/unix_ntfs-3g_xattr_efs.h"
+#include "wimlib/unix_ntfs-3g_mounted_efs.h"
 
 static bool
 check_signature(utf16lechar *a, utf16lechar *b) {
@@ -23,16 +23,19 @@ efs_readable_size(efs_buffer *buf) {
 	return buf->length - buf->position;
 }
 
-static void
+static int
 efs_cleanup(efs_buffer *buf) {
 	if (!buf->buffer) {
-		return;
+		return WIMLIB_ERR_SUCCESS;
 	}
 
 	size_t remain = buf->length - buf->position;
 
 	if (remain) {
 		void *new_p = MALLOC(remain);
+		if (!new_p) {
+			return WIMLIB_ERR_NOMEM;
+		}
 		memcpy(new_p, buf->buffer + buf->position, remain);
 		FREE(buf->buffer);
 		buf->buffer = new_p;
@@ -40,14 +43,26 @@ efs_cleanup(efs_buffer *buf) {
 
 	buf->position = 0;
 	buf->length = remain;
+
+	return WIMLIB_ERR_SUCCESS;
 }
 
-static void
+static int
 efs_append(efs_buffer *buf, const void *p, size_t len) {
-	efs_cleanup(buf);
+	int ret = efs_cleanup(buf);
+	if (ret) {
+		return ret;
+	}
+
 	buf->buffer = REALLOC(buf->buffer, buf->length + len);
+	if (!buf->buffer) {
+		return WIMLIB_ERR_NOMEM;
+	}
+
 	memcpy(buf->buffer + buf->length, p, len);
 	buf->length += len;
+
+	return WIMLIB_ERR_SUCCESS;
 }
 
 static inline void
@@ -210,17 +225,24 @@ bool read_stream_data_value(efs_context *ctx, void **write_p, size_t *write_byte
 	return true;
 }
 
-bool
+int
 efs_parse_chunk(const void *p, const void *efs_p, size_t *len, efs_context *ctx) {
 
 	if (!ctx->buffer.buffer) {
 		ctx->buffer.buffer = MALLOC(*len);
+		if (!ctx->buffer.buffer) {
+			return WIMLIB_ERR_NOMEM;
+		}
+
 		memcpy(ctx->buffer.buffer, p, *len);
 		ctx->buffer.length = *len;
 		ctx->buffer.position = 0;
 	}
 	else {
-		efs_append(&ctx->buffer, p, *len);
+		int ret = efs_append(&ctx->buffer, p, *len);
+		if (ret) {
+			return ret;
+		}
 	}
 
 	size_t write_byte = 0;
@@ -236,12 +258,12 @@ efs_parse_chunk(const void *p, const void *efs_p, size_t *len, efs_context *ctx)
 				ctx->parse_state = STRM_HEADER_STATE;
 			}
 			else if (ctx->err_flag) {
-				return false;
+				return WIMLIB_ERR_READ;
 			}
 			else {
 				if (write_byte)
 					goto WRITE_DATA;
-				return true;
+				return WIMLIB_ERR_SUCCESS;
 				// read more
 			}
 			break;
@@ -250,11 +272,11 @@ efs_parse_chunk(const void *p, const void *efs_p, size_t *len, efs_context *ctx)
 			if (next == NULL_STATE) {
 				if (write_byte)
 					goto WRITE_DATA;
-				return true;
+				return WIMLIB_ERR_SUCCESS;
 				// read more
 			}
 			else if (ctx->err_flag) {
-				return false;
+				return WIMLIB_ERR_READ;
 			}
 			else {
 				ctx->parse_state = next;
@@ -266,12 +288,12 @@ efs_parse_chunk(const void *p, const void *efs_p, size_t *len, efs_context *ctx)
 				ctx->parse_state = STRM_HEADER_STATE;
 			}
 			else if (ctx->err_flag) {
-				return false;
+				return WIMLIB_ERR_READ;
 			}
 			else {
 				if (write_byte)
 					goto WRITE_DATA;
-				return true;
+				return WIMLIB_ERR_SUCCESS;
 				// read more
 			}
 			break;
@@ -281,22 +303,22 @@ efs_parse_chunk(const void *p, const void *efs_p, size_t *len, efs_context *ctx)
 				ctx->parse_state = STRM_DATA_VALUE_STATE;
 			}
 			else if (ctx->err_flag) {
-				return false;
+				return WIMLIB_ERR_READ;
 			}
 			else {
 				if (write_byte)
 					goto WRITE_DATA;
-				return true;
+				return WIMLIB_ERR_SUCCESS;
 				// read more
 			}
 			break;
 		case STRM_DATA_VALUE_STATE:
-			finish = read_stream_data_value(ctx, &write_p, &write_byte);
+			finish = read_stream_data_value(ctx, &write_p, &write_byte); //16 byte over
 			if (finish) {
 				ctx->parse_state = STRM_HEADER_STATE;
 			}
 			else if (ctx->err_flag) {
-				return false;
+				return WIMLIB_ERR_READ;
 			}
 			else {
 				if (write_byte)
@@ -308,5 +330,5 @@ efs_parse_chunk(const void *p, const void *efs_p, size_t *len, efs_context *ctx)
 WRITE_DATA:
 	*len = write_byte; // set length of currently written data
 
-	return true;
+	return WIMLIB_ERR_SUCCESS;
 }
