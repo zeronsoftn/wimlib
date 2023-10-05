@@ -224,6 +224,7 @@ enum {
 	IMAGEX_WIMBOOT_CONFIG_OPTION,
 	IMAGEX_WIMBOOT_OPTION,
 	IMAGEX_XML_OPTION,
+	IMAGEX_UNIX_NTFS_3G_MOUNTED_OPTION,
 };
 
 static const struct option apply_options[] = {
@@ -241,6 +242,7 @@ static const struct option apply_options[] = {
 	{T("wimboot"),     no_argument,       NULL, IMAGEX_WIMBOOT_OPTION},
 	{T("compact"),     required_argument, NULL, IMAGEX_COMPACT_OPTION},
 	{T("recover-data"), no_argument,      NULL, IMAGEX_RECOVER_DATA_OPTION},
+	{T("unix-ntfs-3g-mounted"), no_argument,   NULL, IMAGEX_UNIX_NTFS_3G_MOUNTED_OPTION},
 	{NULL, 0, NULL, 0},
 };
 
@@ -1606,6 +1608,9 @@ imagex_apply(int argc, tchar **argv, int cmd)
 			break;
 		case IMAGEX_RECOVER_DATA_OPTION:
 			extract_flags |= WIMLIB_EXTRACT_FLAG_RECOVER_DATA;
+			break;
+		case IMAGEX_UNIX_NTFS_3G_MOUNTED_OPTION:
+			extract_flags |= WIMLIB_EXTRACT_FLAG_UNIX_NTFS_3G_MOUNTED;
 			break;
 		default:
 			goto out_usage;
@@ -4367,7 +4372,7 @@ T(
 "                    [--check] [--ref=\"GLOB\"] [--no-acls] [--strict-acls]\n"
 "                    [--no-attributes] [--rpfix] [--norpfix]\n"
 "                    [--include-invalid-names] [--wimboot] [--unix-data]\n"
-"                    [--compact=FORMAT] [--recover-data]\n"
+"                    [--compact=FORMAT] [--recover-data] [--unix-ntfs-3g-mounted]\n"
 ),
 [CMD_CAPTURE] =
 T(

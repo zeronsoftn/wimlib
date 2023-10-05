@@ -2076,6 +2076,11 @@ typedef int (*wimlib_iterate_lookup_table_callback_t)(const struct wimlib_resour
 #define WIMLIB_EXTRACT_FLAG_WIMBOOT			0x00400000
 
 /**
+ *  Extract to mounted directory using extended attributes provided by ntfs-3g driver.
+*/
+#define WIMLIB_EXTRACT_FLAG_UNIX_NTFS_3G_MOUNTED 0x00800000
+
+/**
  * Since wimlib v1.8.2 and Windows-only: compress the extracted files using
  * System Compression, when possible.  This only works on either Windows 10 or
  * later, or on an older Windows to which Microsoft's wofadk.sys driver has been

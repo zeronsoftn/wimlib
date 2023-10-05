@@ -344,6 +344,9 @@ inode_get_unnamed_data_stream(const struct wim_inode *inode)
 }
 
 struct wim_inode_stream *
+inode_get_efsrpc_raw_stream(const struct wim_inode *inode);
+
+struct wim_inode_stream *
 inode_add_stream(struct wim_inode *inode, int stream_type,
 		 const utf16lechar *stream_name, struct blob_descriptor *blob);
 
@@ -389,9 +392,20 @@ stream_is_unnamed_data_stream(const struct wim_inode_stream *strm)
 }
 
 static inline bool
+stream_is_unnamed_data_or_encrypted_stream(const struct wim_inode_stream *strm) {
+	return (strm->stream_type == STREAM_TYPE_DATA || strm->stream_type == STREAM_TYPE_EFSRPC_RAW_DATA) && !stream_is_named(strm);
+}
+
+static inline bool
 stream_is_named_data_stream(const struct wim_inode_stream *strm)
 {
 	return strm->stream_type == STREAM_TYPE_DATA && stream_is_named(strm);
+}
+
+static inline bool
+stream_is_efsrpc_raw_stream(const struct wim_inode_stream *strm)
+{
+	return strm->stream_type == STREAM_TYPE_EFSRPC_RAW_DATA;
 }
 
 bool
@@ -413,6 +427,9 @@ inode_get_blob_for_unnamed_data_stream(const struct wim_inode *inode,
 
 struct blob_descriptor *
 inode_get_blob_for_unnamed_data_stream_resolved(const struct wim_inode *inode);
+
+struct blob_descriptor *
+inode_get_efsrpc_stream_resolved(const struct wim_inode *strm);
 
 const u8 *
 stream_hash(const struct wim_inode_stream *strm);

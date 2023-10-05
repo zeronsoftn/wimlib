@@ -181,8 +181,13 @@ libwim_la_SOURCES += src/wimboot.c			\
 		     include/wimlib/wof.h
 PLATFORM_LIBS = -lntdll
 else
-libwim_la_SOURCES += src/unix_apply.c		\
-		     src/unix_capture.c
+libwim_la_SOURCES += src/unix_apply.c				\
+			 src/unix_ntfs-3g_mounted_apply.c	\
+			 src/unix_capture.c			\
+			 src/unix_ntfs-3g_mounted_efs.c		\
+			 include/wimlib/unix-ntfs-3g_mounted.h	\
+			 include/wimlib/unix_ntfs-3g_mounted_efs.h
+
 PLATFORM_LIBS =
 endif
 
