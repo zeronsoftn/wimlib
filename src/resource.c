@@ -36,7 +36,6 @@
 #include "wimlib/endianness.h"
 #include "wimlib/error.h"
 #include "wimlib/file_io.h"
-#include "wimlib/inode.h"
 #include "wimlib/ntfs_3g.h"
 #include "wimlib/resource.h"
 #include "wimlib/sha1.h"
@@ -77,6 +76,7 @@
  *   chunk is prefixed with its compressed size as a 32-bit integer.  This
  *   format allows a resource to be written without rewinding.
  */
+
 
 struct data_range {
 	u64 offset;
@@ -1328,7 +1328,6 @@ read_blob_list(struct list_head *blob_list, size_t list_head_offset,
 				continue;
 			}
 		}
-		
 
 		ret = read_blob_with_cbs(blob, sink_cbs, flags & RECOVER_DATA);
 		if (unlikely(ret && ret != BEGIN_BLOB_STATUS_SKIP_BLOB))
